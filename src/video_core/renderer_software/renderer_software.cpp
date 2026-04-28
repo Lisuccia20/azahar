@@ -34,6 +34,7 @@ void RendererSoftware::PrepareRenderTarget() {
     }
 }
 
+
 void RendererSoftware::LoadFBToScreenInfo(int i, const Pica::ColorFill& color_fill) {
     const u32 fb_id = i == 2 ? 1 : 0;
     const auto& framebuffer = pica.regs.framebuffer_config[fb_id];

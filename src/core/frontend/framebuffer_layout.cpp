@@ -394,6 +394,7 @@ FramebufferLayout FrameLayoutFromResolutionScale(u32 res_scale, bool is_secondar
                                        is_portrait);
 
             break;
+
         case Settings::PortraitLayoutOption::PortraitTopFullWidth:
             width = Core::kScreenTopWidth * res_scale;
             // clang-format off
@@ -504,6 +505,12 @@ FramebufferLayout FrameLayoutFromResolutionScale(u32 res_scale, bool is_secondar
             layout = HybridScreenLayout(width, height, Settings::values.swap_screen.GetValue(),
                                         Settings::values.upright_screen.GetValue());
             break;
+
+        case Settings::LayoutOption::StreamingLayout:
+            width  = Core::kScreenTopWidth * res_scale;
+            height = Core::kScreenTopHeight * res_scale; // ✅ finestra = solo top screen
+            layout = StreamingFrameLayout(width, height);
+            break;
         case Settings::LayoutOption::Default:
         default:
             width = Core::kScreenTopWidth * res_scale;
@@ -520,6 +527,42 @@ FramebufferLayout FrameLayoutFromResolutionScale(u32 res_scale, bool is_secondar
 
     return layout;
     UNREACHABLE();
+}
+
+FramebufferLayout StreamingFrameLayout(u32 width, u32 height) {
+    ASSERT(width > 0);
+    ASSERT(height > 0);
+
+    // Top screen: occupa tutta la larghezza della finestra mantenendo l'aspect ratio
+    Common::Rectangle<u32> screen_window_area{0, 0, width, height};
+    Common::Rectangle<u32> top_rect{0, 0, Core::kScreenTopWidth, Core::kScreenTopHeight};
+    top_rect = MaxRectangle(screen_window_area, top_rect,
+                            Settings::values.use_integer_scaling.GetValue());
+    // Centra orizzontalmente
+    top_rect = top_rect.TranslateX((width - top_rect.GetWidth()) / 2);
+
+    // Bottom screen: piazzato subito sotto il top screen, fuori dalla viewport visibile
+    // Il framebuffer totale è più alto della finestra — la viewport vede solo il top
+    const float bot_scale = static_cast<float>(top_rect.GetWidth()) /
+                            static_cast<float>(Core::kScreenTopWidth);
+    const u32 bot_w = static_cast<u32>(Core::kScreenBottomWidth * bot_scale);
+    const u32 bot_h = static_cast<u32>(Core::kScreenBottomHeight * bot_scale);
+    const u32 bot_x = top_rect.left + (top_rect.GetWidth() - bot_w) / 2;
+    const u32 bot_y = top_rect.bottom; // ✅ subito sotto il top, fuori dalla viewport
+
+    Common::Rectangle<u32> bot_rect{bot_x, bot_y, bot_x + bot_w, bot_y + bot_h};
+
+    FramebufferLayout res{
+        width,                    // width = larghezza finestra (Mac vede questa)
+        bot_y + bot_h,            // height = top + bottom (framebuffer totale, più alto della finestra)
+        true,                     // top_screen_enabled
+        true,                     // bottom_screen_enabled
+        top_rect,
+        bot_rect,
+        true,                     // is_rotated
+    };
+
+    return res;
 }
 
 FramebufferLayout GetCardboardSettings(const FramebufferLayout& layout) {
@@ -683,10 +726,15 @@ std::pair<unsigned, unsigned> GetMinimumSizeFromLayout(Settings::LayoutOption la
                                           ? largeHeight + smallHeight
                                           : std::max(largeHeight, smallHeight));
         break;
+
     }
     case Settings::LayoutOption::SideScreen:
         min_width = Core::kScreenTopWidth + Core::kScreenBottomWidth;
         min_height = Core::kScreenBottomHeight;
+        break;
+    case Settings::LayoutOption::StreamingLayout:
+        min_width  = Core::kScreenTopWidth;
+        min_height = Core::kScreenTopHeight;
         break;
     case Settings::LayoutOption::Default:
     default:

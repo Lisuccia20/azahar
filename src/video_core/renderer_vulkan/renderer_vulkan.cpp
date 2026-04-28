@@ -14,7 +14,9 @@
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "video_core/renderer_vulkan/vk_memory_util.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
-
+#include "video_core/ScreenStreamer.h"
+#include <iostream>
+#include <cerrno>
 #include "video_core/host_shaders/vulkan_present_anaglyph_frag.h"
 #include "video_core/host_shaders/vulkan_present_frag.h"
 #include "video_core/host_shaders/vulkan_present_interlaced_frag.h"
@@ -36,6 +38,7 @@
 MICROPROFILE_DEFINE(Vulkan_RenderFrame, "Vulkan", "Render Frame", MP_RGB(128, 128, 64));
 
 namespace Vulkan {
+vk::Format MakeFormat(VideoCore::PixelFormat format);
 
 struct ScreenRectVertex {
     ScreenRectVertex() = default;
@@ -130,6 +133,8 @@ RendererVulkan::RendererVulkan(Core::System& system, Pica::PicaCore& pica_,
     CompileShaders();
     BuildLayouts();
     BuildPipelines();
+
+    screen_streamer = new ScreenStreamer(5000, &system);
     if (secondary_window) {
         secondary_present_window_ptr = std::make_unique<PresentWindow>(
             *secondary_window, instance, scheduler, IsLowRefreshRate());
@@ -150,6 +155,14 @@ RendererVulkan::~RendererVulkan() {
 
     for (auto& sampler : present_samplers) {
         device.destroySampler(sampler);
+    }
+
+    // Aspetta tutti gli slot pendenti prima di distruggere
+    for (auto& slot : stream_slots_) {
+        if (slot.pending)
+            scheduler.Wait(slot.tick);
+        if (slot.buf != VK_NULL_HANDLE)
+            vmaDestroyBuffer(instance.GetAllocator(), slot.buf, slot.buf_alloc);
     }
 
     for (auto& info : screen_infos) {
@@ -184,6 +197,63 @@ void RendererVulkan::PrepareRendertarget() {
 
         LoadFBToScreenInfo(framebuffer, screen_infos[i], i == 1);
     }
+}
+
+void RendererVulkan::EnsureStreamTexture(u32 w, u32 h) {
+    if (stream_tex.initialized && stream_tex.width == w && stream_tex.height == h)
+        return;
+
+    DestroyStreamTexture();
+
+    const VkImageCreateInfo img_ci = {
+        .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType     = VK_IMAGE_TYPE_2D,
+        .format        = VK_FORMAT_B8G8R8A8_UNORM,  // ✅ formato fisso noto
+        .extent        = {w, h, 1},
+        .mipLevels     = 1,
+        .arrayLayers   = 1,
+        .samples       = VK_SAMPLE_COUNT_1_BIT,
+        .tiling        = VK_IMAGE_TILING_OPTIMAL,
+        .usage         = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode   = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    const VmaAllocationCreateInfo alloc_ci = {
+        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+    };
+
+    vmaCreateImage(instance.GetAllocator(), &img_ci, &alloc_ci,
+                   &stream_tex.image, &stream_tex.alloc, nullptr);
+
+    // Transizione iniziale a eTransferDstOptimal
+    scheduler.Record([img = stream_tex.image](vk::CommandBuffer cmdbuf) {
+        vk::ImageMemoryBarrier barrier = {
+            .srcAccessMask       = {},
+            .dstAccessMask       = vk::AccessFlagBits::eTransferWrite,
+            .oldLayout           = vk::ImageLayout::eUndefined,
+            .newLayout           = vk::ImageLayout::eTransferDstOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image               = img,
+            .subresourceRange    = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
+        cmdbuf.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::PipelineStageFlagBits::eTransfer,
+            {}, {}, {}, barrier);
+    });
+    scheduler.Finish();
+
+    stream_tex.width       = w;
+    stream_tex.height      = h;
+    stream_tex.initialized = true;
+}
+
+void RendererVulkan::DestroyStreamTexture() {
+    if (!stream_tex.initialized) return;
+    vmaDestroyImage(instance.GetAllocator(), stream_tex.image, stream_tex.alloc);
+    stream_tex = {};
 }
 
 void RendererVulkan::PrepareDraw(Frame* frame, const Layout::FramebufferLayout& layout) {
@@ -997,8 +1067,11 @@ void RendererVulkan::DrawBottomScreen(const Layout::FramebufferLayout& layout,
     }
 }
 
-void RendererVulkan::DrawScreens(Frame* frame, const Layout::FramebufferLayout& layout,
-                                 bool flipped) {
+void RendererVulkan::DrawScreens(Frame* frame,
+                                 const Layout::FramebufferLayout& layout,
+                                 bool flipped)
+{
+    // --- Settings updates ---
     if (settings.bg_color_update_requested.exchange(false)) {
         clear_color.float32[0] = Settings::values.bg_red.GetValue();
         clear_color.float32[1] = Settings::values.bg_green.GetValue();
@@ -1008,45 +1081,279 @@ void RendererVulkan::DrawScreens(Frame* frame, const Layout::FramebufferLayout& 
         ReloadPipeline(layout.render_3d_mode);
     }
 
+    // --- Draw ---
     PrepareDraw(frame, layout);
 
-    const auto& top_screen = layout.top_screen;
-    const auto& bottom_screen = layout.bottom_screen;
     draw_info.modelview = MakeOrthographicMatrix(layout.width, layout.height);
-
     draw_info.layer = 0;
-
-    // Apply the initial default opacity value; Needed to avoid flickering
     ApplySecondLayerOpacity(1.0f);
 
     if (!Settings::values.swap_screen.GetValue()) {
-        DrawTopScreen(layout, top_screen);
+        DrawTopScreen(layout, layout.top_screen);
         draw_info.layer = 0;
-        if (layout.bottom_opacity < 1) {
+        if (layout.bottom_opacity < 1.0f)
             ApplySecondLayerOpacity(layout.bottom_opacity);
-        }
-        DrawBottomScreen(layout, bottom_screen);
+        DrawBottomScreen(layout, layout.bottom_screen);
     } else {
-        DrawBottomScreen(layout, bottom_screen);
+        DrawBottomScreen(layout, layout.bottom_screen);
         draw_info.layer = 0;
-        if (layout.top_opacity < 1) {
+        if (layout.top_opacity < 1.0f)
             ApplySecondLayerOpacity(layout.top_opacity);
-        }
-        DrawTopScreen(layout, top_screen);
+        DrawTopScreen(layout, layout.top_screen);
     }
 
     if (layout.additional_screen_enabled) {
-        const auto& additional_screen = layout.additional_screen;
-        if (!Settings::values.swap_screen.GetValue()) {
-            DrawTopScreen(layout, additional_screen);
-        } else {
-            DrawBottomScreen(layout, additional_screen);
-        }
+        if (!Settings::values.swap_screen.GetValue())
+            DrawTopScreen(layout, layout.additional_screen);
+        else
+            DrawBottomScreen(layout, layout.additional_screen);
     }
 
     DrawCursor(layout);
 
-    scheduler.Record([](vk::CommandBuffer cmdbuf) { cmdbuf.endRenderPass(); });
+    scheduler.Record([](vk::CommandBuffer cmdbuf) {
+        cmdbuf.endRenderPass();
+    });
+
+    // --- Streaming ---
+    TryStreamBottomScreen();
+}
+
+// ----------------------------------------------------------------
+//  DestroyStreamSlot
+//  Distrugge tutte le risorse di uno slot (dopo aver aspettato il tick)
+// ----------------------------------------------------------------
+void RendererVulkan::DestroyStreamSlot(u32 idx) {
+    auto& slot = stream_slots_[idx];
+
+    if (slot.pending) {
+        scheduler.Wait(slot.tick);
+        slot.pending = false;
+    }
+
+    const vk::Device dev = instance.GetDevice();
+
+    if (slot.frame_fb != VK_NULL_HANDLE) {
+        dev.destroyFramebuffer(vk::Framebuffer{slot.frame_fb});
+        slot.frame_fb = VK_NULL_HANDLE;
+    }
+    if (slot.frame_view != VK_NULL_HANDLE) {
+        dev.destroyImageView(vk::ImageView{slot.frame_view});
+        slot.frame_view = VK_NULL_HANDLE;
+    }
+    if (slot.frame_image != VK_NULL_HANDLE) {
+        vmaDestroyImage(instance.GetAllocator(),
+                        slot.frame_image, slot.frame_alloc);
+        slot.frame_image = VK_NULL_HANDLE;
+        slot.frame_alloc = VK_NULL_HANDLE;
+    }
+    if (slot.buf != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(instance.GetAllocator(), slot.buf, slot.buf_alloc);
+        slot.buf       = VK_NULL_HANDLE;
+        slot.buf_alloc = VK_NULL_HANDLE;
+        slot.mapped    = nullptr;
+    }
+}
+
+// ----------------------------------------------------------------
+//  EnsureStreamSlots
+//  Crea/ricrea entrambi gli slot se la dimensione cambia
+// ----------------------------------------------------------------
+void RendererVulkan::EnsureStreamSlots(u64 required_size) {
+    if (required_size <= stream_slot_size_)
+        return;
+
+    // Distruggi gli slot esistenti
+    for (u32 i = 0; i < STREAM_BUF_COUNT; i++)
+        DestroyStreamSlot(i);
+    stream_slot_size_ = 0;
+
+    const VkBufferCreateInfo buf_ci = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size  = required_size,
+        .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+    };
+    const VmaAllocationCreateInfo alloc_ci = {
+        .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
+                 VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+        .usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+    };
+
+    for (u32 i = 0; i < STREAM_BUF_COUNT; i++) {
+        auto& slot = stream_slots_[i];
+        VmaAllocationInfo info{};
+        if (vmaCreateBuffer(instance.GetAllocator(), &buf_ci, &alloc_ci,
+                            &slot.buf, &slot.buf_alloc, &info) != VK_SUCCESS) {
+            std::cerr << "[Stream] ERRORE: vmaCreateBuffer fallito per slot " << i << "\n";
+            return;
+        }
+        slot.mapped  = info.pMappedData;
+        slot.pending = false;
+        slot.tick    = 0;
+    }
+
+    stream_slot_size_ = required_size;
+    std::cerr << "[Stream] Allocati " << STREAM_BUF_COUNT
+              << " slot da " << required_size << " bytes\n";
+}
+
+// ----------------------------------------------------------------
+//  TryStreamBottomScreen
+//  Chiamata ogni frame da DrawScreens
+// ----------------------------------------------------------------
+void RendererVulkan::TryStreamBottomScreen() {
+    if (!screen_streamer || !screen_streamer->IsDirectMode())
+        return;
+
+    stream_frame_counter_++;
+    if ((stream_frame_counter_ % 2) != 0)
+        return;
+
+    // Dimensioni native bottom screen 3DS
+    constexpr u32 SW = 240;  // larghezza del frame = larghezza portrait
+    constexpr u32 SH = 320;  // altezza del frame = altezza portrait
+    constexpr u64 required = static_cast<u64>(SW) * SH * 4;
+
+    EnsureStreamSlots(required);
+    if (stream_slot_size_ == 0)
+        return;
+
+    const u32 write_idx = stream_write_idx_;
+    const u32 read_idx  = (stream_write_idx_ + STREAM_BUF_COUNT - 1) % STREAM_BUF_COUNT;
+
+    auto& write_slot = stream_slots_[write_idx];
+    auto& read_slot  = stream_slots_[read_idx];
+
+    // --- Leggi lo slot precedente (read) ---
+    // Aspetta che la GPU abbia finito di scrivere su di esso
+    if (read_slot.pending) {
+        scheduler.Wait(read_slot.tick);
+        read_slot.pending = false;
+
+        // Ora è sicuro leggere dalla CPU
+        vmaInvalidateAllocation(instance.GetAllocator(),
+                                read_slot.buf_alloc, 0, VK_WHOLE_SIZE);
+        screen_streamer->sendFrame(read_slot.mapped, SW, SH);
+    }
+
+    // --- Distruggi il frame del write_slot del ciclo precedente ---
+    // (la GPU ha finito con esso — era il read_slot due cicli fa,
+    //  e abbiamo già aspettato il suo tick)
+    const vk::Device dev = instance.GetDevice();
+    if (write_slot.frame_fb != VK_NULL_HANDLE) {
+        dev.destroyFramebuffer(vk::Framebuffer{write_slot.frame_fb});
+        write_slot.frame_fb = VK_NULL_HANDLE;
+    }
+    if (write_slot.frame_view != VK_NULL_HANDLE) {
+        dev.destroyImageView(vk::ImageView{write_slot.frame_view});
+        write_slot.frame_view = VK_NULL_HANDLE;
+    }
+    if (write_slot.frame_image != VK_NULL_HANDLE) {
+        vmaDestroyImage(instance.GetAllocator(),
+                        write_slot.frame_image, write_slot.frame_alloc);
+        write_slot.frame_image = VK_NULL_HANDLE;
+        write_slot.frame_alloc = VK_NULL_HANDLE;
+    }
+
+    // --- Crea il frame dedicato 320x240 per questo ciclo ---
+    Frame sf{};
+    main_present_window.RecreateFrame(&sf, SW, SH);
+
+    // Setup descriptor
+    const auto sampler     = present_samplers[!Settings::values.filter_mode.GetValue()];
+    const auto present_set = present_heap.Commit();
+    for (u32 i = 0; i < screen_infos.size(); i++)
+        update_queue.AddImageSampler(present_set, 0, i,
+                                     screen_infos[i].image_view, sampler);
+
+    // --- Renderpass sul frame dedicato ---
+    renderpass_cache.EndRendering();
+    scheduler.Record([this, sf_fb   = sf.framebuffer,
+                            sf_w    = sf.width,
+                            sf_h    = sf.height,
+                            present_set,
+                            renderpass = main_present_window.Renderpass(),
+                            idx        = current_pipeline](vk::CommandBuffer cmdbuf)
+    {
+        const vk::Viewport vp = {
+            .x = 0, .y = 0,
+            .width = (float)sf_w, .height = (float)sf_h,
+            .minDepth = 0, .maxDepth = 1,
+        };
+        const vk::Rect2D sc = {{0, 0}, {sf_w, sf_h}};
+        cmdbuf.setViewport(0, vp);
+        cmdbuf.setScissor(0, sc);
+
+        const vk::ClearValue clear{.color = clear_color};
+        const vk::RenderPassBeginInfo rp = {
+            .renderPass      = renderpass,
+            .framebuffer     = sf_fb,
+            .renderArea      = {{0, 0}, {sf_w, sf_h}},
+            .clearValueCount = 1,
+            .pClearValues    = &clear,
+        };
+        cmdbuf.beginRenderPass(rp, vk::SubpassContents::eInline);
+        cmdbuf.bindPipeline(vk::PipelineBindPoint::eGraphics, present_pipelines[idx]);
+        cmdbuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                  *present_pipeline_layout, 0, present_set, {});
+    });
+
+    // Disegna screen_infos[2] = bottom screen, riempie tutto il frame
+    draw_info.modelview = MakeOrthographicMatrix(SW, SH);
+    draw_info.layer     = 0;
+    ApplySecondLayerOpacity(1.0f);
+    DrawSingleScreen(2, 0.0f, 0.0f, (float)SW, (float)SH,
+                 Layout::DisplayOrientation::Portrait);
+
+    scheduler.Record([](vk::CommandBuffer cmdbuf) {
+        cmdbuf.endRenderPass();
+    });
+
+    // --- Copia frame -> staging buffer ---
+    scheduler.Record([src = sf.image,
+                      buf = write_slot.buf](vk::CommandBuffer cmdbuf)
+    {
+        const vk::ImageMemoryBarrier to_src = {
+            .srcAccessMask       = vk::AccessFlagBits::eColorAttachmentWrite,
+            .dstAccessMask       = vk::AccessFlagBits::eTransferRead,
+            .oldLayout           = vk::ImageLayout::eGeneral,
+            .newLayout           = vk::ImageLayout::eTransferSrcOptimal,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image               = src,
+            .subresourceRange    = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
+        cmdbuf.pipelineBarrier(
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits::eTransfer,
+            {}, {}, {}, to_src);
+
+        cmdbuf.copyImageToBuffer(
+            src, vk::ImageLayout::eTransferSrcOptimal,
+            vk::Buffer{buf},
+            vk::BufferImageCopy{
+                .bufferRowLength   = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource  = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+                .imageOffset       = {0, 0, 0},
+                .imageExtent       = {SW, SH, 1},
+            });
+    });
+
+    // Flush asincrono — la GPU continua, noi no aspettiamo
+    const u64 tick = scheduler.CurrentTick();
+    scheduler.Flush();
+    write_slot.tick    = tick;
+    write_slot.pending = true;
+
+    // Salva il frame nello slot — verrà distrutto al prossimo ciclo
+    write_slot.frame_image = sf.image;
+    write_slot.frame_alloc = sf.allocation;
+    write_slot.frame_view  = sf.image_view;
+    write_slot.frame_fb    = sf.framebuffer;
+
+    // Avanza al prossimo slot
+    stream_write_idx_ = (stream_write_idx_ + 1) % STREAM_BUF_COUNT;
 }
 
 void RendererVulkan::DrawCursor(const Layout::FramebufferLayout& layout) {
@@ -1113,6 +1420,7 @@ void RendererVulkan::SwapBuffers() {
     system.perf_stats->StartSwap();
     const Layout::FramebufferLayout& layout = render_window.GetFramebufferLayout();
     PrepareRendertarget();
+
     RenderScreenshot();
     RenderToWindow(main_present_window, layout, false);
 #ifndef ANDROID

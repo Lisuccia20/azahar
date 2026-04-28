@@ -16,6 +16,7 @@
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
 #include "video_core/renderer_vulkan/vk_render_manager.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
+#include "video_core/ScreenStreamer.h"
 
 namespace Core {
 class System;
@@ -83,7 +84,21 @@ public:
     void SwapBuffers() override;
     void TryPresent(int timeout_ms, bool is_secondary) override {}
 
+    struct StreamTexture {
+        VkImage       image      = VK_NULL_HANDLE;
+        VkImageView   image_view = VK_NULL_HANDLE;
+        VmaAllocation alloc      = VK_NULL_HANDLE;
+        u32           width      = 0;
+        u32           height     = 0;
+        bool          initialized = false;
+    };
+    StreamTexture stream_tex;
+    void EnsureStreamTexture(u32 w, u32 h);
+    void DestroyStreamTexture();
+
 private:
+    // All'interno della classe RendererVulkan, sezione private:
+    ScreenStreamer* screen_streamer = nullptr;
     void ReloadPipeline(Settings::StereoRenderOption render_3d);
     void CompileShaders();
     void BuildLayouts();
@@ -119,6 +134,33 @@ private:
     void FillScreen(Common::Vec3<u8> color, const TextureInfo& texture);
 
 private:
+    // --- Streaming ---
+    void TryStreamBottomScreen();
+    void EnsureStreamSlots(u64 required_size);
+    void DestroyStreamSlot(u32 idx);
+
+    static constexpr u32 STREAM_BUF_COUNT = 2;
+
+    struct StreamStagingSlot {
+        // Staging buffer CPU-visible
+        VkBuffer      buf             = VK_NULL_HANDLE;
+        VmaAllocation buf_alloc       = VK_NULL_HANDLE;
+        void*         mapped          = nullptr;
+        // Frame dedicato per il rendering
+        VkImage       frame_image     = VK_NULL_HANDLE;
+        VmaAllocation frame_alloc     = VK_NULL_HANDLE;
+        VkImageView   frame_view      = VK_NULL_HANDLE;
+        VkFramebuffer frame_fb        = VK_NULL_HANDLE;
+        // Sincronizzazione
+        u64           tick            = 0;
+        bool          pending         = false;
+    };
+
+    StreamStagingSlot stream_slots_[STREAM_BUF_COUNT];
+    u32               stream_write_idx_      = 0;
+    u64               stream_slot_size_      = 0;
+    u32               stream_frame_counter_  = 0;
+
     Memory::MemorySystem& memory;
     Pica::PicaCore& pica;
 

@@ -581,6 +581,10 @@ System::ResultStatus System::Init(Frontend::EmuWindow& emu_window,
 
     auto gsp = service_manager->GetService<Service::GSP::GSP_GPU>("gsp::Gpu");
     gpu = std::make_unique<VideoCore::GPU>(*this, emu_window, secondary_window);
+
+    screen_streamer = std::make_unique<ScreenStreamer>(5001, this);
+
+
     gpu->SetInterruptHandler(
         [gsp](Service::GSP::InterruptId interrupt_id) { gsp->SignalInterrupt(interrupt_id); });
 
@@ -691,6 +695,7 @@ void System::Shutdown(bool is_deserializing) {
 
     // Shutdown emulation session
     is_powered_on = false;
+    screen_streamer.reset();
 
     gpu.reset();
     if (!is_deserializing) {

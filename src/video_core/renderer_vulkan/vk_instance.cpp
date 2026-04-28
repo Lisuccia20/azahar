@@ -19,31 +19,7 @@ namespace Vulkan {
 
 namespace {
 
-vk::Format MakeFormat(VideoCore::PixelFormat format) {
-    switch (format) {
-    case VideoCore::PixelFormat::RGBA8:
-        return vk::Format::eR8G8B8A8Unorm;
-    case VideoCore::PixelFormat::RGB8:
-        return vk::Format::eB8G8R8Unorm;
-    case VideoCore::PixelFormat::RGB5A1:
-        return vk::Format::eR5G5B5A1UnormPack16;
-    case VideoCore::PixelFormat::RGB565:
-        return vk::Format::eR5G6B5UnormPack16;
-    case VideoCore::PixelFormat::RGBA4:
-        return vk::Format::eR4G4B4A4UnormPack16;
-    case VideoCore::PixelFormat::D16:
-        return vk::Format::eD16Unorm;
-    case VideoCore::PixelFormat::D24:
-        return vk::Format::eX8D24UnormPack32;
-    case VideoCore::PixelFormat::D24S8:
-        return vk::Format::eD24UnormS8Uint;
-    case VideoCore::PixelFormat::Invalid:
-        LOG_ERROR(Render_Vulkan, "Unknown texture format {}!", format);
-        return vk::Format::eUndefined;
-    default:
-        return vk::Format::eR8G8B8A8Unorm; ///< Use default case for the texture formats
-    }
-}
+
 
 vk::Format MakeCustomFormat(VideoCore::CustomPixelFormat format) {
     switch (format) {
@@ -130,6 +106,59 @@ std::string GetReadableVersion(u32 version) {
 }
 
 } // Anonymous namespace
+
+vk::Format Vulkan::Instance::MakeFormat(VideoCore::PixelFormat format) {
+    switch (format) {
+    case VideoCore::PixelFormat::RGBA8:
+        return vk::Format::eR8G8B8A8Unorm;
+    case VideoCore::PixelFormat::RGB8:
+        return vk::Format::eB8G8R8Unorm;
+    case VideoCore::PixelFormat::RGB5A1:
+        return vk::Format::eR5G5B5A1UnormPack16;
+    case VideoCore::PixelFormat::RGB565:
+        return vk::Format::eR5G6B5UnormPack16;
+    case VideoCore::PixelFormat::RGBA4:
+        return vk::Format::eR4G4B4A4UnormPack16;
+    case VideoCore::PixelFormat::D16:
+        return vk::Format::eD16Unorm;
+    case VideoCore::PixelFormat::D24:
+        return vk::Format::eX8D24UnormPack32;
+    case VideoCore::PixelFormat::D24S8:
+        return vk::Format::eD24UnormS8Uint;
+    case VideoCore::PixelFormat::Invalid:
+        LOG_ERROR(Render_Vulkan, "Unknown texture format {}!", format);
+        return vk::Format::eUndefined;
+    default:
+        return vk::Format::eR8G8B8A8Unorm; ///< Use default case for the texture formats
+    }
+}
+
+// Aggiungi dopo la definizione di Instance::MakeFormat (dopo la riga ~132)
+vk::Format MakeFormat(VideoCore::PixelFormat format) {
+    switch (format) {
+    case VideoCore::PixelFormat::RGBA8:
+        return vk::Format::eR8G8B8A8Unorm;
+    case VideoCore::PixelFormat::RGB8:
+        return vk::Format::eB8G8R8Unorm;
+    case VideoCore::PixelFormat::RGB5A1:
+        return vk::Format::eR5G5B5A1UnormPack16;
+    case VideoCore::PixelFormat::RGB565:
+        return vk::Format::eR5G6B5UnormPack16;
+    case VideoCore::PixelFormat::RGBA4:
+        return vk::Format::eR4G4B4A4UnormPack16;
+    case VideoCore::PixelFormat::D16:
+        return vk::Format::eD16Unorm;
+    case VideoCore::PixelFormat::D24:
+        return vk::Format::eX8D24UnormPack32;
+    case VideoCore::PixelFormat::D24S8:
+        return vk::Format::eD24UnormS8Uint;
+    case VideoCore::PixelFormat::Invalid:
+        LOG_ERROR(Render_Vulkan, "Unknown texture format {}!", format);
+        return vk::Format::eUndefined;
+    default:
+        return vk::Format::eR8G8B8A8Unorm;
+    }
+}
 
 Instance::Instance(bool enable_validation, bool dump_command_buffers)
     : library{OpenLibrary()},

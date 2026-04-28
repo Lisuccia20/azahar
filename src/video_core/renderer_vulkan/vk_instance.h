@@ -277,6 +277,7 @@ public:
                driver_id == vk::DriverIdKHR::eQualcommProprietary;
     }
 
+
 protected:
     /// Returns the optimal supported usage for the requested format
     [[nodiscard]] FormatTraits DetermineTraits(VideoCore::PixelFormat pixel_format,
@@ -302,6 +303,7 @@ protected:
     void CollectToolingInfo();
 
 protected:
+    vk::Format MakeFormat(VideoCore::PixelFormat format);
     std::shared_ptr<Common::DynamicLibrary> library;
     vk::UniqueInstance instance;
     vk::PhysicalDevice physical_device;
@@ -341,5 +343,7 @@ protected:
     bool has_nsight_graphics{};
     bool has_renderdoc{};
 };
+
+
 
 } // namespace Vulkan

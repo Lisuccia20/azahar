@@ -154,6 +154,14 @@ FramebufferLayout AndroidSecondaryLayout(u32 width, u32 height);
 FramebufferLayout CustomFrameLayout(u32 width, u32 height, bool is_swapped,
                                     bool is_portrait_mode = false);
 
+                                    /**
+ * Factory method for constructing a layout for streaming:
+ * Top screen fills the window, bottom screen is placed below (hidden from viewport)
+ * @param width Window framebuffer width in pixels
+ * @param height Window framebuffer height in pixels
+ */
+FramebufferLayout StreamingFrameLayout(u32 width, u32 height);
+
 /**
  * Convenience method to get frame layout by resolution scale
  * Read from the current settings to determine which layout to use.

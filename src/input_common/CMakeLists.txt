@@ -5,6 +5,8 @@ add_library(input_common STATIC
     keyboard.h
     main.cpp
     main.h
+    udp/remote_switch.cpp
+    udp/remote_switch.h
     motion_emu.cpp
     motion_emu.h
     precompiled_headers.h

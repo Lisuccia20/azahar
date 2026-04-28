@@ -27,6 +27,10 @@ Keyboard* GetKeyboard();
 
 class MotionEmu;
 
+
+class RemoteSwitch; // Forward declaration
+std::shared_ptr<RemoteSwitch> GetRemoteSwitch(); // Funzione per ottenere il driver
+
 /// Gets the motion emulation factory.
 MotionEmu* GetMotionEmu();
 

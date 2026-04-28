@@ -98,6 +98,7 @@ add_library(video_core STATIC
     utils.h
     video_core.cpp
     video_core.h
+    ScreenStreamer.cpp
 )
 
 if (ENABLE_SOFTWARE_RENDERER)

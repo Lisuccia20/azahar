@@ -281,6 +281,11 @@ void EmuWindow::UpdateCurrentFramebufferLayout(u32 width, u32 height, bool is_po
                                                    Settings::values.upright_screen.GetValue());
             break;
 #endif
+        case Settings::LayoutOption::StreamingLayout:
+            layout = Layout::StreamingFrameLayout(width, height);
+            // ✅ La finestra mostra solo il top screen — tronca l'altezza visibile
+            layout.height = layout.top_screen.bottom;
+            break;
         case Settings::LayoutOption::Default:
         default:
             layout =

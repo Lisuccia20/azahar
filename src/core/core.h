@@ -19,6 +19,8 @@
 #include "core/hle/service/plgldr/plgldr.h"
 #include "core/movie.h"
 #include "core/perf_stats.h"
+#include "video_core/ScreenStreamer.h"
+#include <memory>
 
 namespace Frontend {
 class EmuWindow;
@@ -233,6 +235,8 @@ public:
 
     [[nodiscard]] VideoCore::GPU& GPU();
 
+    [[nodiscard]] Frontend::EmuWindow* GetEmuWindow() const { return m_emu_window; }
+
     /**
      * Gets a reference to the service manager.
      * @returns A reference to the service manager.
@@ -403,6 +407,9 @@ public:
         info_led_color_changed = func;
     }
 
+
+    ScreenStreamer* GetScreenStreamer() { return screen_streamer.get(); }
+
 private:
     /**
      * Initialize the emulated system.
@@ -417,6 +424,8 @@ private:
 
     /// Reschedule the core emulation
     void Reschedule();
+
+    std::unique_ptr<ScreenStreamer> screen_streamer;
 
     /// AppLoader used to load the current executing application
     std::unique_ptr<Loader::AppLoader> app_loader;
