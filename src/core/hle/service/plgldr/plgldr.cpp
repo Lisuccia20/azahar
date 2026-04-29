@@ -35,6 +35,17 @@
 #include "core/hle/service/plgldr/plgldr.h"
 #include "core/loader/loader.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERIALIZE_EXPORT_IMPL(Service::PLGLDR::PLG_LDR)
 SERVICE_CONSTRUCT_IMPL(Service::PLGLDR::PLG_LDR)
 

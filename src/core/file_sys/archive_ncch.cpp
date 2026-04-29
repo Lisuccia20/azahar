@@ -27,6 +27,17 @@
 #include "mii.app.romfs.h"
 #include "shared_font.app.romfs.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERIALIZE_EXPORT_IMPL(FileSys::NCCHArchive)
 SERIALIZE_EXPORT_IMPL(FileSys::NCCHFile)
 SERIALIZE_EXPORT_IMPL(FileSys::ArchiveFactory_NCCH)

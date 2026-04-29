@@ -14,6 +14,17 @@
 #include "core/file_sys/errors.h"
 #include "core/file_sys/path_parser.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERIALIZE_EXPORT_IMPL(FileSys::SDMCArchive)
 SERIALIZE_EXPORT_IMPL(FileSys::ArchiveFactory_SDMC)
 

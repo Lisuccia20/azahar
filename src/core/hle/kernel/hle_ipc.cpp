@@ -360,3 +360,13 @@ void MappedBuffer::Write(const void* src_buffer, std::size_t offset, std::size_t
 }
 
 } // namespace Kernel
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif

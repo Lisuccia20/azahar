@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
-
-#include <limits>
-#include <mutex>
-#include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_master_semaphore.h"
+#include "video_core/renderer_vulkan/vk_instance.h"
+#include <mutex>
+#ifdef WAIT_TIMEOUT
+#undef WAIT_TIMEOUT
+#endif
 
 namespace Vulkan {
 

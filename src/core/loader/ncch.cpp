@@ -30,6 +30,17 @@
 #include "core/system_titles.h"
 #include "network/network.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 namespace Loader {
 
 using namespace Common::Literals;

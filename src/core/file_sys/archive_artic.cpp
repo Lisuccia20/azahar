@@ -4,6 +4,17 @@
 
 #include "archive_artic.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 namespace FileSys {
 
 std::vector<u8> ArticArchive::BuildFSPath(const Path& path) {

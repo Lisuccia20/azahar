@@ -99,6 +99,17 @@ typedef struct stat file_stat_t;
 #include <streams/file_stream.h>
 #include <streams/file_stream_transforms.h>
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 #define FILE RFILE
 #define FTELL rftell
 #define FOPEN rfopen

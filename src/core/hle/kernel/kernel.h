@@ -8,6 +8,7 @@
 
 #pragma once
 
+
 #include <array>
 #include <atomic>
 #include <functional>
@@ -22,6 +23,17 @@
 #include "core/hle/kernel/memory.h"
 #include "core/hle/result.h"
 #include "core/memory.h"
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
 
 namespace ConfigMem {
 class Handler;
@@ -489,3 +501,11 @@ private:
 
 BOOST_CLASS_EXPORT_KEY(Kernel::New3dsHwCapabilities)
 BOOST_CLASS_EXPORT_KEY(Kernel::Core1CpuTime)
+
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#endif

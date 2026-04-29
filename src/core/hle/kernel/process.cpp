@@ -656,3 +656,13 @@ std::shared_ptr<Process> KernelSystem::GetProcessById(u32 process_id) const {
     return *itr;
 }
 } // namespace Kernel
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif

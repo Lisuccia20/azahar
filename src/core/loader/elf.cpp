@@ -18,6 +18,17 @@
 #include "core/loader/elf.h"
 #include "core/memory.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 using Kernel::CodeSet;
 
 // File type

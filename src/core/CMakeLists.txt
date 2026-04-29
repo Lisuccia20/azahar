@@ -545,4 +545,5 @@ endif()
 
 if (CITRA_USE_PRECOMPILED_HEADERS)
     target_precompile_headers(citra_core PRIVATE precompiled_headers.h)
+target_compile_options(citra_core PRIVATE -include ${CMAKE_SOURCE_DIR}/src/common/win32_undef_last.h)
 endif()

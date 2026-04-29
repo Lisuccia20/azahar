@@ -142,3 +142,13 @@ void Mutex::serialize(Archive& ar, const unsigned int) {
 SERIALIZE_IMPL(Mutex)
 
 } // namespace Kernel
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif

@@ -4,6 +4,7 @@
 
 #pragma once
 
+
 #include <memory>
 #include <string>
 #include <utility>
@@ -15,6 +16,17 @@
 #include "common/swap.h"
 #include "core/file_sys/delay_generator.h"
 #include "core/hle/result.h"
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
 
 namespace FileSys {
 
@@ -304,3 +316,10 @@ public:
 };
 
 } // namespace FileSys
+
+
+#ifdef _WIN32
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif

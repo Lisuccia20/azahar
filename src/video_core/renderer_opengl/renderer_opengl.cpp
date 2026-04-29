@@ -15,7 +15,6 @@
 #include "video_core/renderer_opengl/post_processing_opengl.h"
 #include "video_core/renderer_opengl/renderer_opengl.h"
 #include "video_core/shader/generator/glsl_shader_gen.h"
-#include "video_core/ScreenStreamer.h"
 #include <vector>
 
 #include "video_core/host_shaders/opengl_present_anaglyph_frag.h"
@@ -79,8 +78,6 @@ RendererOpenGL::RendererOpenGL(Core::System& system, Pica::PicaCore& pica_,
     : VideoCore::RendererBase{system, window, secondary_window}, pica{pica_},
       rasterizer{system.Memory(), pica, system.CustomTexManager(), *this, driver},
       frame_dumper{system, window} {
-
-    screen_streamer = std::make_unique<ScreenStreamer>(5000, &system.GetEmuInstance());
     const bool has_debug_tool = driver.HasDebugTool();
     window.mailbox = std::make_unique<OGLTextureMailbox>(has_debug_tool);
     if (secondary_window) {
@@ -111,27 +108,6 @@ void RendererOpenGL::SwapBuffers() {
 #else
     const auto& main_layout = render_window.GetFramebufferLayout();
     RenderToMailbox(main_layout, render_window.mailbox, false);
-
-    // --- INIZIO LOGICA STREAMING SWITCH ---
-    if (screen_streamer) {
-        // Buffer statico per non riallocare memoria ogni frame (320x240 * 4 byte RGBA)
-        static std::vector<uint8_t> streamer_buffer(320 * 240 * 4);
-
-        // Otteniamo le coordinate del bottom screen dal layout attuale
-        const auto& bottom_rect = main_layout.bottom_screen;
-
-        // Ci assicuriamo di leggere dal buffer che contiene il rendering finale
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-
-        // Leggiamo i pixel: specifichiamo GL_BGRA perché è il formato nativo
-        // che abbiamo impostato nello ScreenStreamer.cpp
-        glReadPixels(bottom_rect.left, bottom_rect.top, 320, 240,
-                     GL_BGRA, GL_UNSIGNED_BYTE, streamer_buffer.data());
-
-        // Invio dei dati allo streamer
-        screen_streamer->sendFrame(streamer_buffer.data(), 320, 240);
-    }
-    // --- FINE LOGICA STREAMING SWITCH ---
 
 #ifdef ANDROID
     if (secondary_window) {

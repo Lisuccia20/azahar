@@ -29,6 +29,17 @@
 #include "core/hle/result.h"
 #include "core/hle/service/fs/archive.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 namespace Service::FS {
 
 bool IsInstalledApplication(std::string_view path) {

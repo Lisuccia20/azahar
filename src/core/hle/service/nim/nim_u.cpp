@@ -9,6 +9,17 @@
 #include "core/hle/kernel/event.h"
 #include "core/hle/service/nim/nim_u.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERVICE_CONSTRUCT_IMPL(Service::NIM::NIM_U)
 SERIALIZE_EXPORT_IMPL(Service::NIM::NIM_U)
 

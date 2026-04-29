@@ -10,6 +10,17 @@
 #include "core/file_sys/file_backend.h"
 #include "core/hle/result.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 namespace FileSys {
 
 /// Archive backend for general save data archive type (SaveData and SystemSaveData)

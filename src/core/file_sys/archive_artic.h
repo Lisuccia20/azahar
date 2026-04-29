@@ -1,7 +1,11 @@
 // Copyright 2024 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
-
+#ifdef _WIN32
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
 #include "atomic"
 
 #include <boost/serialization/unique_ptr.hpp>
@@ -13,6 +17,17 @@
 #include "core/hle/service/fs/archive.h"
 #include "core/perf_stats.h"
 #include "network/artic_base/artic_base_client.h"
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
 
 namespace FileSys {
 

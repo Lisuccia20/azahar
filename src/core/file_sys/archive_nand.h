@@ -12,6 +12,17 @@
 #include "core/file_sys/archive_backend.h"
 #include "core/hle/result.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 namespace FileSys {
 
 enum class NANDArchiveType : u32 {

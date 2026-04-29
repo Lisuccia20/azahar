@@ -49,8 +49,6 @@ public:
         return &rasterizer;
     }
 
-    std::unique_ptr<ScreenStreamer> screen_streamer;
-
     void SwapBuffers() override;
     void TryPresent(int timeout_ms, bool is_secondary) override;
     void PrepareVideoDumping() override;

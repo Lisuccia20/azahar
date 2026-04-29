@@ -23,6 +23,17 @@
 #include "core/hle/service/news/news_u.h"
 #include "core/hle/service/service.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERVICE_CONSTRUCT_IMPL(Service::NEWS::Module)
 
 namespace Service::NEWS {

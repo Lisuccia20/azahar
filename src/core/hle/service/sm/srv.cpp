@@ -24,6 +24,17 @@
 #include "core/hle/service/sm/sm.h"
 #include "core/hle/service/sm/srv.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERVICE_CONSTRUCT_IMPL(Service::SM::SRV)
 SERIALIZE_EXPORT_IMPL(Service::SM::SRV)
 

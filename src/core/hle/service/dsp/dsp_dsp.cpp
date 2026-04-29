@@ -11,6 +11,17 @@
 #include "core/hle/kernel/process.h"
 #include "core/hle/service/dsp/dsp_dsp.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 using DspPipe = AudioCore::DspPipe;
 using InterruptType = Service::DSP::InterruptType;
 

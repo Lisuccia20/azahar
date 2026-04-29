@@ -19,7 +19,7 @@ SERIALIZE_EXPORT_IMPL(Service::LDR::ClientSlot)
 
 namespace Service::LDR {
 
-static const Result RO_ERROR_ALREADY_INITIALIZED = // 0xD9612FF9
+static const Result ERROR_ALREADY_INITIALIZED = // 0xD9612FF9
     Result(ErrorDescription::AlreadyInitialized, ErrorModule::RO, ErrorSummary::Internal,
            ErrorLevel::Permanent);
 static const Result ERROR_NOT_INITIALIZED = // 0xD9612FF8
@@ -77,7 +77,7 @@ void RO::Initialize(Kernel::HLERequestContext& ctx) {
     ClientSlot* slot = GetSessionData(ctx.Session());
     if (slot->loaded_crs != 0) {
         LOG_ERROR(Service_LDR, "Already initialized");
-        rb.Push(RO_ERROR_ALREADY_INITIALIZED);
+        rb.Push(ERROR_ALREADY_INITIALIZED);
         return;
     }
 

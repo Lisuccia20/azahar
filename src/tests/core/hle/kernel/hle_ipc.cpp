@@ -13,6 +13,17 @@
 #include "core/hle/kernel/process.h"
 #include "core/hle/kernel/server_session.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 namespace Kernel {
 
 static std::shared_ptr<Object> MakeObject(Kernel::KernelSystem& kernel) {

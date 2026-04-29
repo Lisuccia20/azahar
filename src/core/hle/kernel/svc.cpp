@@ -2459,3 +2459,13 @@ void SVCContext::CallSVC(u32 immediate) {
 
 SERIALIZE_EXPORT_IMPL(Kernel::SVC_SyncCallback)
 SERIALIZE_EXPORT_IMPL(Kernel::SVC_IPCCallback)
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif

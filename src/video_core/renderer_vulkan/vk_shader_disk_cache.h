@@ -250,7 +250,7 @@ private:
             NONE = 0,
             READ,
             APPEND,
-            DELETE,
+            REMOVE,
             RECREATE,
         };
 
@@ -360,3 +360,8 @@ private:
 };
 
 } // namespace Vulkan
+
+#ifdef _WIN32
+#undef REMOVE
+#undef DELETE
+#endif

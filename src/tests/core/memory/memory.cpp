@@ -8,6 +8,17 @@
 #include "core/hle/kernel/process.h"
 #include "core/memory.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 TEST_CASE("memory.IsValidVirtualAddress", "[core][memory]") {
     Core::Timing timing(1, 100);
     Core::System system;

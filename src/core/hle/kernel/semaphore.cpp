@@ -12,6 +12,17 @@
 #include "core/hle/kernel/semaphore.h"
 #include "core/hle/kernel/thread.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERIALIZE_EXPORT_IMPL(Kernel::Semaphore)
 
 namespace Kernel {

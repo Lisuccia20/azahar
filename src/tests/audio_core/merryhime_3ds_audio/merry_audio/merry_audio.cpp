@@ -8,6 +8,17 @@
 #include "common/file_util.h"
 #include "merry_audio.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 #define VERIFY(call) call
 
 namespace MerryAudio {

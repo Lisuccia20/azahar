@@ -18,6 +18,17 @@
 #include "core/hle/service/fs/file.h"
 #include "network/artic_base/artic_base_client.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 /// The unique system identifier hash, also known as ID0
 static constexpr char SYSTEM_ID[]{"00000000000000000000000000000000"};
 /// The scrambled SD card CID, also known as ID1

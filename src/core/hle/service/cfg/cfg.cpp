@@ -1332,3 +1332,13 @@ std::string GenerateRandomMAC() {
 }
 
 } // namespace Service::CFG
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif

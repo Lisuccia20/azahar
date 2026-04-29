@@ -16,6 +16,17 @@
 #include "core/hw/aes/key.h"
 #include "core/loader/loader.h"
 
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif
+
+
 SERVICE_CONSTRUCT_IMPL(Service::NFC::NfcDevice)
 
 namespace Service::NFC {

@@ -284,3 +284,13 @@ Loader::SMDH::TitleLanguage DLP_Base::SystemLanguageToSMDHLanguage(CFG::SystemLa
 }
 
 } // namespace Service::DLP
+
+#ifdef _WIN32
+#undef CreateMutex
+#undef CreateEvent
+#undef CreateProcess
+#undef CreateSemaphore
+#undef DeleteFile
+#undef CreateFile
+#undef CreateDirectory
+#endif

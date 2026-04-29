@@ -458,7 +458,7 @@ bool ShaderDiskCache::CacheFile::SwitchMode(CacheOpMode mode) {
         file = FileUtil::IOFile(filepath, "ab");
         return file.IsGood();
     }
-    case CacheOpMode::DELETE: {
+    case CacheOpMode::REMOVE: {
         next_entry_id = SIZE_MAX;
         cached_file_data_start = 0;
         cached_file_data.clear();
@@ -467,7 +467,7 @@ bool ShaderDiskCache::CacheFile::SwitchMode(CacheOpMode mode) {
         return FileUtil::Delete(filepath);
     }
     case CacheOpMode::RECREATE: {
-        if (!SwitchMode(CacheOpMode::DELETE)) {
+        if (!SwitchMode(CacheOpMode::REMOVE)) {
             return false;
         }
         if (!FileUtil::CreateEmptyFile(filepath)) {
@@ -578,7 +578,7 @@ bool ShaderDiskCache::InitVSCache(const std::atomic_bool& stop_loading,
         programmable_vertex_map.clear();
         known_vertex_programs.clear();
         if (regenerate_file) {
-            regenerate_file->SwitchMode(CacheFile::CacheOpMode::DELETE);
+            regenerate_file->SwitchMode(CacheFile::CacheOpMode::REMOVE);
         }
     };
 
@@ -872,7 +872,7 @@ bool ShaderDiskCache::InitVSCache(const std::atomic_bool& stop_loading,
 
     if (regenerate_file) {
         // If we are regenerating, replace the old file with the new one.
-        vs_cache.SwitchMode(CacheFile::CacheOpMode::DELETE);
+        vs_cache.SwitchMode(CacheFile::CacheOpMode::REMOVE);
         regenerate_file.reset();
         FileUtil::Rename(GetVSFile(title_id, true), GetVSFile(title_id, false));
     }
@@ -889,7 +889,7 @@ bool ShaderDiskCache::InitFSCache(const std::atomic_bool& stop_loading,
     auto cleanup_on_error = [&]() {
         fragment_shaders.clear();
         if (regenerate_file) {
-            regenerate_file->SwitchMode(CacheFile::CacheOpMode::DELETE);
+            regenerate_file->SwitchMode(CacheFile::CacheOpMode::REMOVE);
         }
     };
 
@@ -1089,7 +1089,7 @@ bool ShaderDiskCache::InitFSCache(const std::atomic_bool& stop_loading,
 
     if (regenerate_file) {
         // If we are regenerating, replace the old file with the new one.
-        fs_cache.SwitchMode(CacheFile::CacheOpMode::DELETE);
+        fs_cache.SwitchMode(CacheFile::CacheOpMode::REMOVE);
         regenerate_file.reset();
         FileUtil::Rename(GetFSFile(title_id, true), GetFSFile(title_id, false));
     }
@@ -1106,7 +1106,7 @@ bool ShaderDiskCache::InitGSCache(const std::atomic_bool& stop_loading,
     auto cleanup_on_error = [&]() {
         fixed_geometry_shaders.clear();
         if (regenerate_file) {
-            regenerate_file->SwitchMode(CacheFile::CacheOpMode::DELETE);
+            regenerate_file->SwitchMode(CacheFile::CacheOpMode::REMOVE);
         }
     };
 
@@ -1315,7 +1315,7 @@ bool ShaderDiskCache::InitGSCache(const std::atomic_bool& stop_loading,
 
     if (regenerate_file) {
         // If we are regenerating, replace the old file with the new one.
-        gs_cache.SwitchMode(CacheFile::CacheOpMode::DELETE);
+        gs_cache.SwitchMode(CacheFile::CacheOpMode::REMOVE);
         regenerate_file.reset();
         FileUtil::Rename(GetGSFile(title_id, true), GetGSFile(title_id, false));
     }
