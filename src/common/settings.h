@@ -19,10 +19,11 @@
 
 namespace Settings {
 
-enum class GraphicsAPI {
+enum class GraphicsAPI : u32 {
     Software = 0,
-    OpenGL = 1,
-    Vulkan = 2,
+    OpenGL   = 1,
+    Vulkan   = 2,
+    Metal    = 3,  // ← AGGIUNGI
 };
 
 enum class InitClock : u32 {
@@ -513,7 +514,7 @@ struct Values {
 // TODO: Add a null renderer backend for this, perhaps.
 #error "At least one renderer must be enabled."
 #endif
-        GraphicsAPI::Software, GraphicsAPI::Vulkan, Keys::graphics_api};
+        GraphicsAPI::Software, GraphicsAPI::Metal, Keys::graphics_api};
     // clang-format on
     SwitchableSetting<u32> physical_device{0, Keys::physical_device};
     Setting<bool> use_gles{false, Keys::use_gles};

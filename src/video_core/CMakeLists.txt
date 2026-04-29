@@ -229,3 +229,27 @@ endif()
 if (CITRA_USE_PRECOMPILED_HEADERS)
     target_precompile_headers(video_core PRIVATE precompiled_headers.h)
 endif()
+
+
+if(APPLE)
+    option(ENABLE_METAL "Enable Metal renderer" ON)
+else()
+    set(ENABLE_METAL OFF)
+endif()
+
+if(ENABLE_METAL)
+    # La define va su video_core, non su azahar
+    target_compile_definitions(video_core PRIVATE ENABLE_METAL)
+
+    target_sources(video_core PRIVATE
+        renderer_metal/renderer_metal.mm
+        renderer_metal/metal_device.mm
+        renderer_metal/metal_texture_mailbox.mm
+    )
+    target_compile_options(video_core PRIVATE -fobjc-arc)
+    target_link_libraries(video_core PRIVATE
+        "-framework Metal"
+        "-framework QuartzCore"
+        "-framework Foundation"
+    )
+endif()

@@ -55,6 +55,30 @@ public:
     void CleanupVideoDumping() override;
 
 private:
+    static constexpr u32 STREAM_BUF_COUNT = 2;
+
+    struct StreamSlot {
+        GLuint pbo   = 0;     // Pixel Buffer Object per readback asincrono
+        GLsync fence = nullptr;
+        bool   pending = false;
+        void*  mapped  = nullptr; // puntatore CPU (persistent mapping)
+    };
+
+    std::array<StreamSlot, STREAM_BUF_COUNT> stream_slots{};
+    u32   stream_write_idx   = 0;
+    u64   stream_slot_size   = 0;
+    u32   stream_frame_counter = 0;
+
+    // Framebuffer dedicato per il bottom screen
+    OGLFramebuffer stream_fbo;
+    OGLTexture     stream_tex;
+    u32            stream_tex_w = 0;
+    u32            stream_tex_h = 0;
+
+    void EnsureStreamSlots(u64 required_size);
+    void DestroyStreamSlot(u32 idx);
+    void EnsureStreamTexture(u32 w, u32 h);
+    void TryStreamBottomScreen();
     void InitOpenGLObjects();
     void ReloadShader(Settings::StereoRenderOption render_3d);
     void PrepareRendertarget();

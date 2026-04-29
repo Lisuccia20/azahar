@@ -124,6 +124,8 @@ void RendererOpenGL::SwapBuffers() {
     }
 #endif
 
+
+
     if (frame_dumper.IsDumping()) {
         try {
             RenderToMailbox(frame_dumper.GetLayout(), frame_dumper.mailbox, true);
@@ -132,6 +134,8 @@ void RendererOpenGL::SwapBuffers() {
         }
     }
 #endif
+
+    TryStreamBottomScreen();
 
     system.perf_stats->EndSwap();
     EndFrame();
@@ -792,6 +796,202 @@ void RendererOpenGL::DrawTopScreen(const Layout::FramebufferLayout& layout,
         break;
     }
     }
+}
+
+// ----------------------------------------------------------------
+// EnsureStreamTexture
+// Crea (o ricrea se le dimensioni cambiano) la texture + FBO
+// off-screen dedicati al bottom screen.
+// ----------------------------------------------------------------
+void RendererOpenGL::EnsureStreamTexture(u32 w, u32 h) {
+    if (stream_tex_w == w && stream_tex_h == h && stream_tex.handle != 0)
+        return;
+
+    // Distruggi le risorse precedenti
+    stream_fbo.Release();
+    stream_tex.Release();
+
+    stream_tex.Create();
+    state.texture_units[0].texture_2d = stream_tex.handle;
+    state.Apply();
+
+    glActiveTexture(GL_TEXTURE0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    state.texture_units[0].texture_2d = 0;
+    state.Apply();
+
+    stream_fbo.Create();
+    state.draw.draw_framebuffer = stream_fbo.handle;
+    state.draw.read_framebuffer = stream_fbo.handle;
+    state.Apply();
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                           GL_TEXTURE_2D, stream_tex.handle, 0);
+
+    ASSERT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    stream_tex_w = w;
+    stream_tex_h = h;
+}
+
+// ----------------------------------------------------------------
+// DestroyStreamSlot
+// Aspetta il fence e distrugge il PBO dello slot.
+// ----------------------------------------------------------------
+void RendererOpenGL::DestroyStreamSlot(u32 idx) {
+    auto& slot = stream_slots[idx];
+
+    if (slot.pending && slot.fence) {
+        glClientWaitSync(slot.fence, GL_SYNC_FLUSH_COMMANDS_BIT, GL_TIMEOUT_IGNORED);
+        glDeleteSync(slot.fence);
+        slot.fence   = nullptr;
+        slot.pending = false;
+    }
+
+    if (slot.pbo != 0) {
+        glDeleteBuffers(1, &slot.pbo);
+        slot.pbo    = 0;
+        slot.mapped = nullptr;
+    }
+}
+
+// ----------------------------------------------------------------
+// EnsureStreamSlots
+// Alloca/riallocà entrambi i PBO se la dimensione richiesta cambia.
+// Usa persistent mapping (GL_ARB_buffer_storage) per evitare
+// glMapBuffer ogni frame.
+// ----------------------------------------------------------------
+void RendererOpenGL::EnsureStreamSlots(u64 required_size) {
+    if (required_size == stream_slot_size)
+        return;
+
+    for (u32 i = 0; i < STREAM_BUF_COUNT; i++)
+        DestroyStreamSlot(i);
+
+    stream_slot_size = 0;
+
+    for (u32 i = 0; i < STREAM_BUF_COUNT; i++) {
+        auto& slot = stream_slots[i];
+        glGenBuffers(1, &slot.pbo);
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
+
+        // Persistent coherent mapping (richiede GL 4.4 / ARB_buffer_storage)
+        const GLbitfield flags = GL_MAP_READ_BIT |
+                                 GL_MAP_PERSISTENT_BIT |
+                                 GL_MAP_COHERENT_BIT;
+        glBufferStorage(GL_PIXEL_PACK_BUFFER,
+                        static_cast<GLsizeiptr>(required_size),
+                        nullptr, flags);
+        slot.mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0,
+                                       static_cast<GLsizeiptr>(required_size),
+                                       flags);
+        slot.pending = false;
+        slot.fence   = nullptr;
+    }
+
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    stream_slot_size = required_size;
+
+    LOG_DEBUG(Render_OpenGL, "Stream: allocati {} PBO da {} bytes",
+              STREAM_BUF_COUNT, required_size);
+}
+
+// ----------------------------------------------------------------
+// TryStreamBottomScreen
+// Chiamata ogni frame da SwapBuffers (dopo DrawScreens).
+// Renderizza il bottom screen (screen_infos[2]) in un FBO dedicato
+// 240x320, poi lo copia via PBO asincrono al ScreenStreamer.
+// ----------------------------------------------------------------
+void RendererOpenGL::TryStreamBottomScreen() {
+    auto* screen_streamer = system.GetScreenStreamer();
+    if (!screen_streamer || !screen_streamer->IsDirectMode())
+        return;
+
+    // Throttle: invia ogni 2 frame per non saturare la banda
+    ++stream_frame_counter;
+    if ((stream_frame_counter % 2) != 0)
+        return;
+
+    // Dimensioni native bottom screen 3DS (portrait)
+    constexpr u32 SW = 320; // larghezza output
+    constexpr u32 SH = 240; // altezza output
+    constexpr u64 required = static_cast<u64>(SW) * SH * 4; // RGBA8
+
+    EnsureStreamSlots(required);
+    if (stream_slot_size == 0)
+        return;
+
+    EnsureStreamTexture(SW, SH);
+
+    const u32 write_idx = stream_write_idx;
+    const u32 read_idx  = (stream_write_idx + STREAM_BUF_COUNT - 1) % STREAM_BUF_COUNT;
+
+    auto& write_slot = stream_slots[write_idx];
+    auto& read_slot  = stream_slots[read_idx];
+
+    // ---- Leggi lo slot precedente (readback CPU) ----
+    if (read_slot.pending && read_slot.fence) {
+        const GLenum result = glClientWaitSync(read_slot.fence,
+                                               GL_SYNC_FLUSH_COMMANDS_BIT, 0);
+        if (result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED) {
+            glDeleteSync(read_slot.fence);
+            read_slot.fence   = nullptr;
+            read_slot.pending = false;
+
+            // Invia i pixel allo streamer
+            screen_streamer->sendFrame(read_slot.mapped, SW, SH);
+        }
+        // Se la GPU non ha ancora finito, saltiamo la lettura questo frame
+    }
+
+    // ---- Renderizza bottom screen nel FBO dedicato ----
+    // Salva lo stato corrente
+    OpenGLState prev_state = OpenGLState::GetCurState();
+
+    state.draw.draw_framebuffer = stream_fbo.handle;
+    state.draw.read_framebuffer = stream_fbo.handle;
+    state.Apply();
+
+    glViewport(0, 0, SW, SH);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Matrice ortografica per il frame 320x240 (non flippato)
+    const auto ortho = MakeOrthographicMatrix(
+        static_cast<float>(SW), static_cast<float>(SH), false);
+    glUniformMatrix3x2fv(uniform_modelview_matrix, 1, GL_FALSE, ortho.data());
+    glUniform1i(uniform_color_texture, 0);
+    glUniform1i(uniform_layer, 0);
+
+    // Disegna screen_infos[2] = bottom screen, riempiendo l'intero FBO
+    DrawSingleScreen(screen_infos[2],
+                     0.f, 0.f,
+                     static_cast<float>(SW), static_cast<float>(SH),
+                     Layout::DisplayOrientation::Landscape);
+
+    // ---- Copia FBO -> PBO in modo asincrono ----
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, write_slot.pbo);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glReadPixels(0, 0, SW, SH, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+
+    // Inserisci fence per sapere quando la GPU ha finito
+    if (write_slot.fence)
+        glDeleteSync(write_slot.fence);
+    write_slot.fence   = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    write_slot.pending = true;
+    glFlush();
+
+    // ---- Ripristina stato ----
+    prev_state.Apply();
+
+    // Avanza al prossimo slot
+    stream_write_idx = (stream_write_idx + 1) % STREAM_BUF_COUNT;
 }
 
 void RendererOpenGL::DrawBottomScreen(const Layout::FramebufferLayout& layout,
