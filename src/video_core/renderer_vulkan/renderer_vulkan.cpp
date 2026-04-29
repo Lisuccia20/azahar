@@ -134,7 +134,6 @@ RendererVulkan::RendererVulkan(Core::System& system, Pica::PicaCore& pica_,
     BuildLayouts();
     BuildPipelines();
 
-    screen_streamer = new ScreenStreamer(5000, &system);
     if (secondary_window) {
         secondary_present_window_ptr = std::make_unique<PresentWindow>(
             *secondary_window, instance, scheduler, IsLowRefreshRate());
@@ -1202,6 +1201,8 @@ void RendererVulkan::EnsureStreamSlots(u64 required_size) {
 //  Chiamata ogni frame da DrawScreens
 // ----------------------------------------------------------------
 void RendererVulkan::TryStreamBottomScreen() {
+
+    auto* screen_streamer = system.GetScreenStreamer();
     if (!screen_streamer || !screen_streamer->IsDirectMode())
         return;
 

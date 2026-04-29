@@ -47,6 +47,9 @@ public:
 
     void handleClientDisconnect();
 
+    void OnGameStarted();
+    void OnGameStopped();
+
     bool IsDirectMode() const { return directMode; }
     std::string directSourceFormat = "RGBA";
 
@@ -85,4 +88,8 @@ private:
     std::atomic<uint32_t> bottom_screen_y{0};
     std::atomic<uint32_t> bottom_screen_w{320};
     std::atomic<uint32_t> bottom_screen_h{240};
+
+    std::atomic<bool> direct_pending{false};
+    std::string pending_ip;
+    uint16_t pending_port{0};
 };

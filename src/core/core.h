@@ -410,6 +410,10 @@ public:
 
     ScreenStreamer* GetScreenStreamer() { return screen_streamer.get(); }
 
+
+    void InitScreenStreamer() {
+        screen_streamer = std::make_unique<ScreenStreamer>(5000, this);
+    }
 private:
     /**
      * Initialize the emulated system.

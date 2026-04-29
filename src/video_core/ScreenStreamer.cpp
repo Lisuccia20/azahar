@@ -347,14 +347,28 @@ void ScreenStreamer::stopDirectMode() {
 
 void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rtpPort) {
     std::cerr << "[Stream] handleDirectClient chiamato ip=" << clientIp << " port=" << rtpPort << "\n";
+
+    if (!system || !system->IsPoweredOn()) {
+        std::cerr << "[Stream] SKIP: sistema non attivo\n";
+        return;
+    }
+
     stopDirectMode();
-
-
 
     std::cerr << "[Streaming] Avvio connessione per " << clientIp << ":" << rtpPort << "\n";
 
     // ✅ Nessun cambio layout — Mac resta su SingleScreen (top screen)
     // Il bottom screen viene letto direttamente da screen_infos[2].texture
+
+    const char* encoder_name = "";
+#if defined(__APPLE__)
+    encoder_name = "vtenc_h264"; // VideoToolbox (Hardware Mac)
+#elif defined(__linux__)
+    encoder_name = "vaapih264enc"; // VA-API (Hardware Linux/SteamOS)
+#elif defined(_WIN32)
+    // Su Windows, d3d11h264enc è solitamente il migliore per latenza e compatibilità GPU
+    encoder_name = "d3d11h264enc";
+#endif
 
     directPipeline  = gst_pipeline_new("direct");
     directAppsrc    = gst_element_factory_make("appsrc",       "d_src");
@@ -362,7 +376,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     auto* conv      = gst_element_factory_make("videoconvert", "d_conv");
     auto* flip      = gst_element_factory_make("videoflip",    "d_flip");
     auto* filter    = gst_element_factory_make("capsfilter",   "d_filter");
-    auto* enc       = gst_element_factory_make("x264enc",      "d_enc");
+    auto* enc       = gst_element_factory_make(encoder_name,      "d_enc");
     auto* d_pay     = gst_element_factory_make("rtph264pay",   "d_pay");
     auto* udpsink   = gst_element_factory_make("udpsink",      "d_udp");
 
@@ -607,7 +621,14 @@ ScreenStreamer::ScreenStreamer(uint16_t port, Core::System* system)
                        (sockaddr*)&clientAddr, clientLen);
                 char clientIp[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, &from.sin_addr, clientIp, sizeof(clientIp));
-                handleDirectClient(std::string(clientIp), 5004);
+                pending_ip   = std::string(clientIp);
+                pending_port = 5004;
+                if (this->system && this->system->IsPoweredOn()) {
+                    handleDirectClient(pending_ip, pending_port);
+                } else {
+                    std::cerr << "[Stream] Connessione ricevuta, in attesa del gioco...\n";
+                    direct_pending = true;
+                }
 
             } else if (n > 10 && memcmp(buf, "WBRT_OFFER", 10) == 0) {
                 handleOffer(std::string(buf + 10, n - 10));
@@ -679,4 +700,19 @@ ScreenStreamer::~ScreenStreamer() {
 #ifdef _WIN32
     WSACleanup();
 #endif
+}
+
+void ScreenStreamer::OnGameStarted() {
+    if (direct_pending) {
+        direct_pending = false;
+        std::cerr << "[Stream] Gioco avviato, avvio stream pendente\n";
+        handleDirectClient(pending_ip, pending_port);
+    }
+}
+
+void ScreenStreamer::OnGameStopped() {
+    std::cerr << "[Stream] Gioco fermato, stop stream\n";
+    stopDirectMode();
+    // direct_pending rimane true se era pendente,
+    // così al prossimo gioco parte automaticamente
 }

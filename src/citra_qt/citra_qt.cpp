@@ -4422,6 +4422,7 @@ int LaunchQtFrontend(int argc, char* argv[]) {
     setlocale(LC_ALL, "C");
 
     auto& system{Core::System::GetInstance()};
+    system.InitScreenStreamer();
 
     // Register Qt image interface
     system.RegisterImageInterface(std::make_shared<QtImageInterface>());
