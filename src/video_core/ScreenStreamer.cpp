@@ -376,7 +376,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     auto* conv      = gst_element_factory_make("videoconvert", "d_conv");
     auto* flip      = gst_element_factory_make("videoflip",    "d_flip");
     auto* filter    = gst_element_factory_make("capsfilter",   "d_filter");
-    auto* enc       = gst_element_factory_make(encoder_name,      "d_enc");
+    auto* enc       = gst_element_factory_make( encoder_name,      "d_enc");
     auto* d_pay     = gst_element_factory_make("rtph264pay",   "d_pay");
     auto* udpsink   = gst_element_factory_make("udpsink",      "d_udp");
 
@@ -408,16 +408,47 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     g_object_set(filter, "caps", f_caps, nullptr);
     gst_caps_unref(f_caps);
 
-    g_object_set(enc,
-                 "tune",           4,
-                 "speed-preset",   1,
-                 "bitrate",        1500,
-                 "key-int-max",    30,
-                 "bframes",        0,
-                 "threads",        2,
-                 "sync-lookahead", 0,
-                 "byte-stream",    TRUE,
-                 nullptr);
+    // ... dopo aver creato 'enc' con la logica condizionale ...
+
+    if (encoder_name == std::string("vtenc_h264")) {
+        // --- Configurazione Apple (VideoToolbox) ---
+        g_object_set(enc,
+                    "bitrate", 1500,
+                    "allow-frame-reordering", FALSE, // Fondamentale per latenza (no B-frames)
+                    "realtime", TRUE,
+                    "max-keyframe-interval", 60,
+                    nullptr);
+    }
+    else if (encoder_name == std::string("vaapih264enc")) {
+        // --- Configurazione Linux (VA-API / Steam Deck) ---
+        g_object_set(enc,
+                    "bitrate", 1500,
+                    nullptr);
+        gst_util_set_object_arg(G_OBJECT(enc), "rate-control", "cbr");
+    }
+    else if (encoder_name == std::string("d3d11h264enc")) {
+        // --- Configurazione Windows (D3D11) ---
+        g_object_set(enc,
+                    "bitrate", 1500,
+                    "gop-size", 30,
+                    nullptr);
+        gst_util_set_object_arg(G_OBJECT(enc), "rc-mode", "cbr");
+        gst_util_set_object_arg(G_OBJECT(enc), "tune", "zerolatency");
+    }
+    else {
+        // --- Fallback Software (x264enc o avenc_h264) ---
+        // Se è x264enc, manteniamo i tuoi parametri originali
+        if (g_object_class_find_property(G_OBJECT_GET_CLASS(enc), "tune")) {
+            g_object_set(enc,
+                        "tune", 4, // zerolatency
+                        "speed-preset", 1, // ultrafast
+                        "bitrate", 1500,
+                        "key-int-max", 30,
+                        "bframes", 0,
+                        "byte-stream", TRUE,
+                        nullptr);
+        }
+    }
     gst_util_set_object_arg(G_OBJECT(enc), "profile", "baseline");
 
     g_object_set(d_pay, "config-interval", 1, "pt", 96, nullptr);
