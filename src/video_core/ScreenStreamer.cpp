@@ -403,8 +403,15 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     // ✅ Ruota 90° CW: la texture è 240x320 (portrait), la Switch vuole 320x240 (landscape)
     g_object_set(flip, "method", 1, nullptr);
 
-    // Forza I420 per x264enc
-    GstCaps* f_caps = gst_caps_from_string("video/x-raw,format=I420");
+    // Sostituisci la tua parte dei caps con questa:
+    GstCaps* f_caps = nullptr;
+    if (encoder_name == std::string("vaapih264enc")) {
+        // NV12 è il formato nativo preferito da VA-API su AMD
+        f_caps = gst_caps_from_string("video/x-raw,format=NV12");
+    } else {
+        // I420 per x264enc e altri
+        f_caps = gst_caps_from_string("video/x-raw,format=I420");
+    }
     g_object_set(filter, "caps", f_caps, nullptr);
     gst_caps_unref(f_caps);
 
@@ -461,8 +468,8 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
 
     gst_bin_add_many(GST_BIN(directPipeline),
                      directAppsrc, queue, conv, flip, filter, enc, d_pay, udpsink, nullptr);
-    gst_element_link_many(directAppsrc, queue, conv, flip, filter, enc, d_pay, udpsink, nullptr);
-
+    // Ordine logico: Sorgente -> Coda -> Ruota -> Converti in YUV -> Filtra -> Codifica
+    gst_element_link_many(directAppsrc, queue, flip, conv, filter, enc, d_pay, udpsink, nullptr);
     directFrameCount = 0;
     directMode       = true;
 
