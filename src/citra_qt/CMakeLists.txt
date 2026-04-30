@@ -133,6 +133,8 @@ add_library(citra_qt STATIC EXCLUDE_FROM_ALL
     dumping/options_dialog.cpp
     dumping/options_dialog.h
     dumping/options_dialog.ui
+    game_grid_widget.cpp
+    game_grid_widget.h
     game_list.cpp
     game_list.h
     game_list_p.h

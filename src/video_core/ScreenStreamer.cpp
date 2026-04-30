@@ -214,8 +214,10 @@ static void on_connection_state_changed(GstElement* element, GParamSpec*, gpoint
 void ScreenStreamer::handleClientDisconnect() {
     std::cerr << "[GST] Client disconnected -> resetting...\n";
     answer_pending = false;
+    // Notifica l'UI che lo streamer si è disconnesso
+    on_disconnected_callback();
     resetWebRTCSession();
-    startDiscovery(5001);
+    startDiscovery(5000);
 }
 
 void ScreenStreamer::resetWebRTCSession() {
@@ -666,6 +668,9 @@ ScreenStreamer::ScreenStreamer(uint16_t port, Core::System* system)
                 } else {
                     std::cerr << "[Stream] Connessione ricevuta, in attesa del gioco...\n";
                     direct_pending = true;
+                    if (on_connected_callback) on_connected_callback();
+                    std::cerr << "[DEBUG] NX_DIRECT ricevuto. callback valida: "
+                        << (on_connected_callback ? "SI" : "NO") << "\n";
                 }
 
             } else if (n > 10 && memcmp(buf, "WBRT_OFFER", 10) == 0) {

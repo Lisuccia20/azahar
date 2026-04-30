@@ -30,6 +30,13 @@ namespace Core {
 
 class ScreenStreamer {
 public:
+
+  void SetOnConnectedCallback(std::function<void()> cb) {
+        on_connected_callback = std::move(cb);
+    }
+    void SetOnDisconnectedCallback(std::function<void()> cb) {
+        on_disconnected_callback = std::move(cb);
+    }
     // Costruttore e Distruttore principali
     ScreenStreamer(uint16_t port, Core::System* system);
     ~ScreenStreamer();
@@ -54,6 +61,9 @@ public:
     std::string directSourceFormat = "RGBA";
 
 private:
+
+  std::function<void()> on_connected_callback;
+    std::function<void()> on_disconnected_callback;
     Settings::LayoutOption previous_layout = Settings::LayoutOption::Default;
     Core::System* system = nullptr;
     std::atomic<bool> running{true};

@@ -7,6 +7,7 @@
 #include <array>
 #include <memory>
 #include <vector>
+#include <chrono>
 #ifdef __unix__
 #include <QDBusObjectPath>
 #endif
@@ -128,6 +129,9 @@ public slots:
 
 signals:
 
+        void StreamerConnected();
+        void StreamerDisconnected();
+
     /**
      * Signal that is emitted when a new EmuThread has been created and an emulation session is
      * about to start. At this time, the core system emulation has been initialized, and all
@@ -153,6 +157,8 @@ signals:
     void UpdateThemedIcons();
 
 private:
+    std::chrono::steady_clock::time_point last_stick_nav_time_;
+        bool streamer_connected = false;
     void InitializeWidgets();
     void InitializeDebugWidgets();
     void InitializeRecentFileMenuActions();
@@ -231,6 +237,10 @@ private:
     void ShowFFmpegErrorMessage();
 
 private slots:
+    void OnRemoteSwitchButton(int button_id);
+    void OnRemoteSwitchStick(float x, float y);
+    void OnStreamerConnected();
+    void OnStreamerDisconnected();
     void OnResumeGame(bool first_start);
     void OnRestartGame();
     void OnPauseGame();

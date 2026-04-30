@@ -1,0 +1,114 @@
+// SPDX-FileCopyrightText: Copyright 2024 Azahar Emulator Project
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#pragma once
+
+#include <vector>
+#include <QFrame>
+#include <QGraphicsDropShadowEffect>
+#include <QLabel>
+#include <QScrollArea>
+#include <QPointer>
+#include <QVariantAnimation>
+#include <QWidget>
+
+class GameCardWidget : public QFrame {
+    Q_OBJECT
+    Q_PROPERTY(bool selected READ IsSelected WRITE SetSelected)
+
+public:
+    explicit GameCardWidget(const QString& title, const QString& filepath,
+                            const QPixmap& cover, QWidget* parent = nullptr);
+
+    QString FilePath() const { return filepath_; }
+    bool IsSelected() const { return selected_; }
+    void SetSelected(bool selected);
+
+signals:
+    void Activated(const QString& filepath);
+    void ContextMenuRequested(const QString& filepath, const QPoint& global_pos);
+
+protected:
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
+    void enterEvent(QEnterEvent* event) override;
+    void leaveEvent(QEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
+
+private:
+    void AnimateScaleTo(qreal target, int duration_ms, QEasingCurve::Type easing);
+    void UpdateCoverPixmap(const QColor& border_color);
+
+    QString filepath_;
+    bool selected_ = false;
+    qreal current_scale_ = 1.0;
+    QPointer<QVariantAnimation> active_anim_;
+
+    QGraphicsDropShadowEffect* shadow_;
+    QLabel* cover_label_;
+    QLabel* title_label_;
+    QPixmap raw_cover_;   // pixmap originale scalato, senza bordo né clip
+
+    static constexpr int kWidth      = 180;
+    static constexpr int kHeight     = 230;
+    static constexpr int kCoverSize  = 156;
+    static constexpr int kCoverRadius = 10;
+    static constexpr int kBorderWidth = 3;
+};
+
+// -------------------------------------------------------
+
+class GameGridWidget : public QScrollArea {
+    Q_OBJECT
+
+public:
+    explicit GameGridWidget(QWidget* parent = nullptr);
+
+    void AddGame(const QString& title, const QString& filepath, const QPixmap& cover);
+    void Clear();
+    void SelectFirst();
+    void NavigateBy(int delta);
+
+    int CurrentColumns() const { return last_cols_; }
+    QString SelectedFilePath() const {
+        if (selected_index_ < 0 ||
+            selected_index_ >= static_cast<int>(cards_.size()))
+            return {};
+        return cards_[selected_index_]->FilePath();
+    }
+
+    void ApplyFilter(const QString& text);
+
+signals:
+    void GameActivated(const QString& filepath);
+    void GameContextMenuRequested(const QString& filepath, const QPoint& global_pos);
+
+protected:
+    void resizeEvent(QResizeEvent* event) override;
+    void showEvent(QShowEvent* event) override;
+
+private:
+    int last_cols_ = 1;
+    void RelayoutCards();
+    void UpdateSelection(int new_index);
+    void ScrollToSelected();
+
+    QWidget* container_;
+    std::vector<GameCardWidget*> cards_;
+    int selected_index_ = -1;
+
+    // Animazioni scroll smooth stile Switch
+    QPointer<QVariantAnimation> scroll_anim_h_;
+    QPointer<QVariantAnimation> scroll_anim_v_;
+
+    static constexpr int kCardW      = 160;
+    static constexpr int kCardH      = 210;
+    static constexpr int kSpacing    = 16;
+    static constexpr int kPadding    = 20;
+    // Padding virtuale aggiunto su ogni lato del container così la card
+    // selezionata può sempre essere centrata anche ai bordi della griglia.
+    // Vale metà viewport — calcolato runtime in RelayoutCards.
+    int virtual_padding_h_ = 0;
+    int virtual_padding_v_ = 0;
+};

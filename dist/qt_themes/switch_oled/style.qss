@@ -1,0 +1,36 @@
+/* ============================================================
+   GameCardWidget — stile Nintendo Switch
+   Includi questo nel tuo stylesheet globale (es. default.qss)
+   ============================================================ */
+
+/* ── Card base — nessun border, gestito inline sulla cover ─── */
+#GameCard {
+    border-radius: 16px;
+    background-color: palette(base);
+    border: none;
+}
+
+/* ── Titolo ─────────────────────────────────────────────────── */
+#GameCardTitle {
+    font-size: 12px;
+    color: palette(text);
+    background: transparent;
+}
+
+/* ── Placeholder cover (nessuna immagine) ───────────────────── */
+#GameCardNoCover {
+    border-radius: 10px;
+    background-color: #2a2a3e;
+    color: #666;
+    font-size: 32px;
+}
+
+/* ── Container della griglia ────────────────────────────────── */
+#GameGridContainer {
+    background: transparent;
+}
+
+#GameGrid {
+    background: transparent;
+    border: none;
+}

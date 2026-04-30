@@ -7,9 +7,11 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QString>
+#include <QStackedWidget>
 #include <QVector>
 #include <QWidget>
 #include "citra_qt/compatibility_list.h"
+#include "citra_qt/game_grid_widget.h"
 #include "common/common_types.h"
 #include "common/play_time_manager.h"
 #include "uisettings.h"
@@ -56,6 +58,7 @@ class GameList : public QWidget {
     Q_OBJECT
 
 public:
+    // ── Colonne ──────────────────────────────────────────────────────────
     enum {
         COLUMN_NAME,
         COLUMN_COMPATIBILITY,
@@ -63,12 +66,18 @@ public:
         COLUMN_FILE_TYPE,
         COLUMN_SIZE,
         COLUMN_PLAY_TIME,
-        COLUMN_COUNT, // Number of columns
+        COLUMN_COUNT,
     };
 
+    // ── Tipi pubblici ────────────────────────────────────────────────────
+    enum class ViewMode    { List, Grid };
+    enum class GridDirection { Up, Down, Left, Right };
+
+    // ── Costruttore / distruttore ────────────────────────────────────────
     explicit GameList(PlayTime::PlayTimeManager& play_time_manager_, GMainWindow* parent = nullptr);
     ~GameList() override;
 
+    // ── API pubblica ─────────────────────────────────────────────────────
     QString GetLastFilterResultItem() const;
     void ClearFilter();
     void SetFilterFocus();
@@ -91,6 +100,14 @@ public:
     void ToggleFavorite(u64 program_id);
     void AddFavorite(u64 program_id);
     void RemoveFavorite(u64 program_id);
+
+    // ── View mode ────────────────────────────────────────────────────────
+    void     SetViewMode(ViewMode mode);
+    ViewMode CurrentViewMode() const { return current_view_mode_; }
+
+    // ── Navigazione grid (chiamata da GMainWindow via RemoteSwitch) ───────
+    void GridNavigate(GridDirection dir);
+    void ActivateGridSelection();
 
     static const QStringList supported_file_extensions;
 
@@ -116,8 +133,26 @@ private slots:
     void OnTextChanged(const QString& new_text);
     void OnFilterCloseClicked();
     void OnUpdateThemedIcons();
+    void SelectFirstGame();
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
+    // ── Grid ─────────────────────────────────────────────────────────────
+    void RebuildGridFromModel();
+
+    // ── Navigazione controller (list mode) ───────────────────────────────
+    void NavigateList(int direction);
+    void ActivateCurrentSelection();
+    void JumpToNextFolder(int direction);
+    void InstallControllerEventFilter();
+
+    // ── Helpers indici ───────────────────────────────────────────────────
+    QModelIndex GetFirstGameIndex() const;
+    QModelIndex GetCurrentIndex() const;
+
+    // ── Slot interni ─────────────────────────────────────────────────────
     void AddDirEntry(GameListDir* entry_items);
     void AddEntry(const QList<QStandardItem*>& entry_items, GameListDir* parent);
     void ValidateEntry(const QModelIndex& item);
@@ -125,8 +160,9 @@ private:
 
     void PopupContextMenu(const QPoint& menu_location);
     void PopupHeaderContextMenu(const QPoint& menu_location);
-    void AddGamePopup(QMenu& context_menu, const QString& path, const QString& name, u64 program_id,
-                      u64 extdata_id, Service::FS::MediaType media_type, bool can_insert);
+    void AddGamePopup(QMenu& context_menu, const QString& path, const QString& name,
+                      u64 program_id, u64 extdata_id, Service::FS::MediaType media_type,
+                      bool can_insert);
     void AddCustomDirPopup(QMenu& context_menu, QModelIndex selected);
     void AddPermDirPopup(QMenu& context_menu, QModelIndex selected);
     void AddFavoritesPopup(QMenu& context_menu);
@@ -137,21 +173,27 @@ private:
     void changeEvent(QEvent*) override;
     void RetranslateUI();
 
-    GameListSearchField* search_field;
-    GMainWindow* main_window = nullptr;
-    QVBoxLayout* layout = nullptr;
-    QTreeView* tree_view = nullptr;
-    QStandardItemModel* item_model = nullptr;
-    GameListWorker* current_worker = nullptr;
-    QFileSystemWatcher* watcher = nullptr;
+    // ── Widget ───────────────────────────────────────────────────────────
+    GameListSearchField* search_field = nullptr;
+    GMainWindow*         main_window  = nullptr;
+    QVBoxLayout*         layout       = nullptr;
+    QTreeView*           tree_view    = nullptr;
+    QStandardItemModel*  item_model   = nullptr;
+    GameListWorker*      current_worker = nullptr;
+    QFileSystemWatcher*  watcher      = nullptr;
+    QStackedWidget*      view_stack   = nullptr;
+    GameGridWidget*      grid_view    = nullptr;
+
+    // ── Stato ────────────────────────────────────────────────────────────
+    ViewMode current_view_mode_ = ViewMode::List;
     CompatibilityList compatibility_list;
+    const PlayTime::PlayTimeManager& play_time_manager;
+    std::chrono::time_point<std::chrono::steady_clock> time_last_refresh;
 
     friend class GameListSearchField;
-
-    const PlayTime::PlayTimeManager& play_time_manager;
-
-    std::chrono::time_point<std::chrono::steady_clock> time_last_refresh;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class GameListPlaceholder : public QWidget {
     Q_OBJECT
@@ -170,6 +212,6 @@ protected:
 
 private:
     QVBoxLayout* layout = nullptr;
-    QLabel* image = nullptr;
-    QLabel* text = nullptr;
+    QLabel*      image  = nullptr;
+    QLabel*      text   = nullptr;
 };
