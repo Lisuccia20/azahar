@@ -8,6 +8,7 @@
 #include <gst/gst.h>
 #include "common/settings.h"
 #include "core/frontend/framebuffer_layout.h"
+#include <functional>
 
 #ifdef _WIN32
   #include <winsock2.h>
