@@ -63,6 +63,11 @@ class GameGridWidget : public QScrollArea {
     Q_OBJECT
 
 public:
+    void RelayoutCards();
+    // ── Navigazione direzionale (chiamata da GameList via RemoteSwitch) ──────────
+    void NavigateGrid(int row_delta, int col_delta);
+    QString SelectedGamePath() const;
+    bool    HasSelection() const { return selected_index_ >= 0; }
     explicit GameGridWidget(QWidget* parent = nullptr);
 
     void AddGame(const QString& title, const QString& filepath, const QPixmap& cover);
@@ -90,7 +95,7 @@ protected:
 
 private:
     int last_cols_ = 1;
-    void RelayoutCards();
+
     void UpdateSelection(int new_index);
     void ScrollToSelected();
 

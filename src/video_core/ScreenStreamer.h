@@ -32,6 +32,8 @@ namespace Core {
 class ScreenStreamer {
 public:
 
+  std::function<void()> on_fullscreen_callback;
+
   void SetOnConnectedCallback(std::function<void()> cb) {
         on_connected_callback = std::move(cb);
     }

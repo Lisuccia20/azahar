@@ -671,6 +671,7 @@ ScreenStreamer::ScreenStreamer(uint16_t port, Core::System* system)
                     if (on_connected_callback) on_connected_callback();
                     std::cerr << "[DEBUG] NX_DIRECT ricevuto. callback valida: "
                         << (on_connected_callback ? "SI" : "NO") << "\n";
+                    if (on_fullscreen_callback) on_fullscreen_callback();
                 }
 
             } else if (n > 10 && memcmp(buf, "WBRT_OFFER", 10) == 0) {

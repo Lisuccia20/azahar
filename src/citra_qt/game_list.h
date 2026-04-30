@@ -58,6 +58,8 @@ class GameList : public QWidget {
     Q_OBJECT
 
 public:
+
+    void RefreshLayout();
     // ── Colonne ──────────────────────────────────────────────────────────
     enum {
         COLUMN_NAME,

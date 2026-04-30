@@ -4158,10 +4158,17 @@ void GMainWindow::OnStreamerConnected() {
     emit UpdateThemedIcons();
     game_list->SetViewMode(GameList::ViewMode::Grid);
 
+    // Passa in fullscreen quando lo streamer si connette
+    showFullScreen();
+
+    QTimer::singleShot(0, this, [this]() {
+        game_list->RefreshLayout();
+    });
+
     // Collega navigazione RemoteSwitch → GameList (thread-safe)
     if (auto remote = InputCommon::GetRemoteSwitch()) {
         remote->SetNavigationCallback([this](int button_id, bool pressed) {
-            if (!pressed) return;  // solo su press, ignora release
+            if (!pressed) return;
             QMetaObject::invokeMethod(this, [this, button_id]() {
                 OnRemoteSwitchButton(button_id);
             }, Qt::QueuedConnection);

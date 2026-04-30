@@ -393,7 +393,16 @@ GameList::GameList(PlayTime::PlayTimeManager& play_time_manager_, GMainWindow* p
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    layout->addWidget(tree_view);
+    view_stack = new QStackedWidget(this);
+
+    grid_view = new GameGridWidget(this);
+    connect(grid_view, &GameGridWidget::GameActivated, this, &GameList::GameChosen);
+
+    view_stack->addWidget(tree_view);
+    view_stack->addWidget(grid_view);
+    view_stack->setCurrentWidget(tree_view);
+
+    layout->addWidget(view_stack);
     layout->addWidget(search_field);
     setLayout(layout);
 }
@@ -1251,4 +1260,89 @@ void GameListPlaceholder::onUpdateThemedIcons() {
 
 void GameListPlaceholder::mouseDoubleClickEvent([[maybe_unused]] QMouseEvent* event) {
     emit GameListPlaceholder::AddDirectory();
+}
+
+// ─── SetViewMode ──────────────────────────────────────────────────────────────
+void GameList::SetViewMode(ViewMode mode) {
+    current_view_mode_ = mode;
+    if (!view_stack) return;
+
+    if (mode == ViewMode::Grid) {
+        view_stack->setCurrentWidget(grid_view);
+        grid_view->setFocus();
+    } else {
+        view_stack->setCurrentWidget(tree_view);
+        tree_view->setFocus();
+    }
+}
+
+// ✅ CORRETTO
+void GameList::GridNavigate(GridDirection dir) {
+    if (!grid_view) return;
+    if (!grid_view->HasSelection()) { SelectFirstGame(); return; }
+    switch (dir) {
+    case GridDirection::Up:    grid_view->NavigateGrid(-1,  0); break;
+    case GridDirection::Down:  grid_view->NavigateGrid( 1,  0); break;
+    case GridDirection::Left:  grid_view->NavigateGrid( 0, -1); break;
+    case GridDirection::Right: grid_view->NavigateGrid( 0,  1); break;
+    }
+}
+
+// ✅ CORRETTO
+void GameList::ActivateGridSelection() {
+    if (!grid_view) return;
+    const QString path = grid_view->SelectedGamePath();
+    if (!path.isEmpty()) emit GameChosen(path);
+}
+
+// ─── SelectFirstGame (private slot) ──────────────────────────────────────────
+void GameList::SelectFirstGame() {
+    if (current_view_mode_ == ViewMode::Grid) {
+        if (grid_view) {
+            grid_view->SelectFirst();
+            grid_view->setFocus();
+        }
+    } else {
+        QModelIndex first = GetFirstGameIndex();
+        if (first.isValid()) {
+            tree_view->setCurrentIndex(first);
+            tree_view->scrollTo(first);
+            tree_view->setFocus();
+        }
+    }
+}
+
+// ─── eventFilter ──────────────────────────────────────────────────────────────
+bool GameList::eventFilter(QObject* watched, QEvent* event) {
+    // Esempio: intercetta KeyPress su tree_view per navigazione controller
+    if (watched == tree_view && event->type() == QEvent::KeyPress) {
+        // Logica custom se necessario
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
+QModelIndex GameList::GetFirstGameIndex() const {
+    if (!item_model) return {};
+
+    // Scorre le top-level items (cartelle/favorites) cercando il primo gioco
+    for (int i = 0; i < item_model->rowCount(); ++i) {
+        QStandardItem* folder = item_model->item(i);
+        if (!folder) continue;
+
+        for (int j = 0; j < folder->rowCount(); ++j) {
+            QStandardItem* child = folder->child(j);
+            if (!child) continue;
+
+            // I giochi hanno il ruolo FullPathRole settato
+            if (!child->data(GameListItemPath::FullPathRole).toString().isEmpty())
+                return child->index();
+        }
+    }
+    return {};
+}
+
+void GameList::RefreshLayout() {
+    if (grid_view && current_view_mode_ == ViewMode::Grid) {
+        grid_view->RelayoutCards();
+    }
 }
