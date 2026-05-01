@@ -312,7 +312,7 @@ void GameGridWidget::resizeEvent(QResizeEvent* event) {
 
 void GameGridWidget::showEvent(QShowEvent* event) {
     QScrollArea::showEvent(event);
-    QTimer::singleShot(0, this, &GameGridWidget::RelayoutCards);
+    QTimer::singleShot(50, this, &GameGridWidget::RelayoutCards);
 }
 
 // ── RelayoutCards ──────────────────────────────────────────────────────────
@@ -328,7 +328,8 @@ void GameGridWidget::RelayoutCards() {
     virtual_padding_h_ = avail_w / 2;
     virtual_padding_v_ = avail_h / 2;
 
-    const int cols = qMax(1, (avail_w - 2 * kPadding + kSpacing) / (kCardW + kSpacing));
+    const int n    = static_cast<int>(visible.size());
+    const int cols = qMax(1, n);
     last_cols_ = cols;
 
     std::vector<GameCardWidget*> visible;
@@ -385,6 +386,10 @@ void GameGridWidget::RelayoutCards() {
 // card appare centrata nel viewport senza selezione attiva.
 
 void GameGridWidget::CenterScrollOnOrigin() {
+    // Forza l'aggiornamento dei scrollbar prima di leggere maximum()
+    container_->updateGeometry();
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
     const int target_h = qBound(0, virtual_padding_h_,
                                  horizontalScrollBar()->maximum());
     const int target_v = qBound(0, virtual_padding_v_,
