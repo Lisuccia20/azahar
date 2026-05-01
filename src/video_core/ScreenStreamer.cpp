@@ -368,8 +368,18 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
 #elif defined(__linux__)
     encoder_name = "vaapih264enc"; // VA-API (Hardware Linux/SteamOS)
 #elif defined(_WIN32)
-    // Su Windows, d3d11h264enc è solitamente il migliore per latenza e compatibilità GPU
-    encoder_name = "d3d11h264enc";
+    GstElementFactory* amf_factory = gst_element_factory_find("amfh264enc");
+    GstElementFactory* mf_factory  = gst_element_factory_find("mfh264enc");
+
+    if (amf_factory) {
+        encoder_name = "amfh264enc";
+        gst_object_unref(amf_factory);
+    } else if (mf_factory) {
+        encoder_name = "mfh264enc";
+        gst_object_unref(mf_factory);
+    } else {
+        encoder_name = "x264enc";
+    }
 #endif
 
     directPipeline  = gst_pipeline_new("direct");
@@ -403,17 +413,18 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
                  nullptr);
 
     // ✅ Ruota 90° CW: la texture è 240x320 (portrait), la Switch vuole 320x240 (landscape)
-    g_object_set(flip, "method", 1, nullptr);
+    // Rotazione condizionale: AMF gestisce diversamente l'orientamento
+    int flip_method = 1; // default 90° CW per tutti
+    if (encoder_name == std::string("amfh264enc")) {
+        flip_method =  5; // 90° CCW per AMD AMF
+    }
+    g_object_set(flip, "method", flip_method, nullptr);
 
     // Sostituisci la tua parte dei caps con questa:
-    GstCaps* f_caps = nullptr;
-    if (encoder_name == std::string("vaapih264enc")) {
-        // NV12 è il formato nativo preferito da VA-API su AMD
-        f_caps = gst_caps_from_string("video/x-raw,format=NV12");
-    } else {
-        // I420 per x264enc e altri
-        f_caps = gst_caps_from_string("video/x-raw,format=I420");
-    }
+    bool needs_nv12 = (encoder_name == std::string("vaapih264enc") ||
+                    encoder_name == std::string("amfh264enc"));
+    GstCaps* f_caps = gst_caps_from_string(
+        needs_nv12 ? "video/x-raw,format=NV12" : "video/x-raw,format=I420");
     g_object_set(filter, "caps", f_caps, nullptr);
     gst_caps_unref(f_caps);
 
@@ -435,7 +446,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
                     nullptr);
         gst_util_set_object_arg(G_OBJECT(enc), "rate-control", "cbr");
     }
-    else if (encoder_name == std::string("d3d11h264enc")) {
+    else if (encoder_name == std::string("mfh264enc")) {
         // --- Configurazione Windows (D3D11) ---
         g_object_set(enc,
                     "bitrate", 2000,
@@ -443,6 +454,14 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
                     nullptr);
         gst_util_set_object_arg(G_OBJECT(enc), "rc-mode", "cbr");
         gst_util_set_object_arg(G_OBJECT(enc), "tune", "zerolatency");
+    }
+    else if (encoder_name == std::string("amfh264enc")) {
+        g_object_set(enc,
+                    "bitrate",  1500,
+                    "gop-size", 30,
+                    nullptr);
+        gst_util_set_object_arg(G_OBJECT(enc), "usage",        "ultralowlatency");
+        gst_util_set_object_arg(G_OBJECT(enc), "rate-control", "cbr");
     }
     else {
         // --- Fallback Software (x264enc o avenc_h264) ---
@@ -471,7 +490,25 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     gst_bin_add_many(GST_BIN(directPipeline),
                      directAppsrc, queue, conv, flip, filter, enc, d_pay, udpsink, nullptr);
     // Ordine logico: Sorgente -> Coda -> Ruota -> Converti in YUV -> Filtra -> Codifica
-    gst_element_link_many(directAppsrc, queue, flip, conv, filter, enc, d_pay, udpsink, nullptr);
+    // Link con debug esplicito
+    struct LinkPair { GstElement* a; GstElement* b; const char* name; };
+    std::vector<LinkPair> links = {
+        {directAppsrc, queue,   "appsrc->queue"},
+        {queue,        conv,    "queue->conv"},
+        {conv,         flip,    "conv->flip"},
+        {flip,         filter,  "flip->filter"},
+        {filter,       enc,     "filter->enc"},
+        {enc,          d_pay,   "enc->pay"},
+        {d_pay,        udpsink, "pay->udpsink"},
+    };
+
+    for (auto& l : links) {
+        if (!gst_element_link(l.a, l.b)) {
+            std::cerr << "[Streaming] LINK FALLITO: " << l.name << "\n";
+        } else {
+            std::cerr << "[Streaming] link OK: " << l.name << "\n";
+        }
+    }
     directFrameCount = 0;
     directMode       = true;
 
