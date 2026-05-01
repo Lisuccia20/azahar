@@ -18,6 +18,7 @@
 #include <atomic>
 #include <thread>
 #include <iostream>
+#include <fstream>
 #include <cerrno>
 #include <vector>
 #include <cstring>
