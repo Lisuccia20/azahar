@@ -159,6 +159,8 @@ signals:
 private:
     std::chrono::steady_clock::time_point last_stick_nav_time_;
         bool streamer_connected = false;
+
+    std::unordered_set<int> remote_buttons_held_;
     void InitializeWidgets();
     void InitializeDebugWidgets();
     void InitializeRecentFileMenuActions();
@@ -237,7 +239,7 @@ private:
     void ShowFFmpegErrorMessage();
 
 private slots:
-    void OnRemoteSwitchButton(int button_id);
+    void OnRemoteSwitchButton(int button_id, bool pressed);
     void OnRemoteSwitchStick(float x, float y);
     void OnStreamerConnected();
     void OnStreamerDisconnected();

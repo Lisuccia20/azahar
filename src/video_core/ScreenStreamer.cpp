@@ -433,7 +433,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     if (encoder_name == std::string("vtenc_h264")) {
         // --- Configurazione Apple (VideoToolbox) ---
         g_object_set(enc,
-                    "bitrate", 2000,
+                    "bitrate", 10000,
                     "allow-frame-reordering", FALSE, // Fondamentale per latenza (no B-frames)
                     "realtime", TRUE,
                     "max-keyframe-interval", 60,
@@ -442,14 +442,14 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     else if (encoder_name == std::string("vaapih264enc")) {
         // --- Configurazione Linux (VA-API / Steam Deck) ---
         g_object_set(enc,
-                    "bitrate", 2000,
+                    "bitrate", 10000,
                     nullptr);
         gst_util_set_object_arg(G_OBJECT(enc), "rate-control", "cbr");
     }
     else if (encoder_name == std::string("mfh264enc")) {
         // --- Configurazione Windows (D3D11) ---
         g_object_set(enc,
-                    "bitrate", 2000,
+                    "bitrate", 10000,
                     "gop-size", 30,
                     nullptr);
         gst_util_set_object_arg(G_OBJECT(enc), "rc-mode", "cbr");
@@ -457,7 +457,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     }
     else if (encoder_name == std::string("amfh264enc")) {
         g_object_set(enc,
-                    "bitrate",  1500,
+                    "bitrate",  10000,
                     "gop-size", 30,
                     nullptr);
         gst_util_set_object_arg(G_OBJECT(enc), "usage",        "ultralowlatency");
@@ -470,7 +470,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
             g_object_set(enc,
                         "tune", 4, // zerolatency
                         "speed-preset", 1, // ultrafast
-                        "bitrate", 1500,
+                        "bitrate", 10000,
                         "key-int-max", 30,
                         "bframes", 0,
                         "byte-stream", TRUE,
@@ -568,9 +568,12 @@ void ScreenStreamer::handleButton(uint8_t type, uint8_t id, int8_t value) {
     if (remote) remote->SetButtonState(id, value != 0);
 }
 
-void ScreenStreamer::handleStick(int16_t lx, int16_t ly) {
+void ScreenStreamer::handleStick(int16_t lx, int16_t ly, int16_t rx, int16_t ry) {
     auto remote = InputCommon::GetRemoteSwitch();
-    if (remote) remote->SetStickState(lx / 32767.0f, ly / 32767.0f);
+    if (remote) {
+        remote->SetStickState(lx / 32767.0f, ly / 32767.0f);
+        remote->SetStickState(rx / 32767.0f, ry / 32767.0f);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -708,7 +711,6 @@ ScreenStreamer::ScreenStreamer(uint16_t port, Core::System* system)
                     if (on_connected_callback) on_connected_callback();
                     std::cerr << "[DEBUG] NX_DIRECT ricevuto. callback valida: "
                         << (on_connected_callback ? "SI" : "NO") << "\n";
-                    if (on_fullscreen_callback) on_fullscreen_callback();
                 }
 
             } else if (n > 10 && memcmp(buf, "WBRT_OFFER", 10) == 0) {

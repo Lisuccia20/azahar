@@ -32,8 +32,8 @@ GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
     setAttribute(Qt::WA_TranslucentBackground, false);
 
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(12, 12, 12, 10);
-    layout->setSpacing(8);
+    layout->setContentsMargins(14, 14, 14, 12);
+    layout->setSpacing(10);
     layout->setAlignment(Qt::AlignHCenter);
 
     // ── Cover ──────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
     title_label_->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
     title_label_->setWordWrap(false);
     QFontMetrics fm(title_label_->font());
-    title_label_->setText(fm.elidedText(title, Qt::ElideRight, kWidth - 24));
+    title_label_->setText(fm.elidedText(title, Qt::ElideRight, kWidth - 28));
 
     layout->addWidget(cover_label_, 0, Qt::AlignHCenter);
     layout->addWidget(title_label_, 0, Qt::AlignHCenter);
@@ -69,8 +69,8 @@ GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
 
     // ── Ombra ──────────────────────────────────────────────────────────────
     shadow_ = new QGraphicsDropShadowEffect(this);
-    shadow_->setBlurRadius(12);
-    shadow_->setOffset(0, 4);
+    shadow_->setBlurRadius(14);
+    shadow_->setOffset(0, 5);
     shadow_->setColor(QColor(0, 0, 0, 80));
     setGraphicsEffect(shadow_);
 }
@@ -144,14 +144,14 @@ void GameCardWidget::SetSelected(bool selected) {
 
     if (selected) {
         AnimateScaleTo(1.08, 200, QEasingCurve::OutBack);
-        shadow_->setBlurRadius(28);
-        shadow_->setOffset(0, 8);
-        shadow_->setColor(QColor(0, 122, 255, 130));
+        shadow_->setBlurRadius(32);
+        shadow_->setOffset(0, 10);
+        shadow_->setColor(QColor(0, 122, 255, 140));
         UpdateCoverPixmap(QColor(0x00, 0x7A, 0xFF));
     } else {
         AnimateScaleTo(1.0, 160, QEasingCurve::OutCubic);
-        shadow_->setBlurRadius(12);
-        shadow_->setOffset(0, 4);
+        shadow_->setBlurRadius(14);
+        shadow_->setOffset(0, 5);
         shadow_->setColor(QColor(0, 0, 0, 80));
         UpdateCoverPixmap(Qt::transparent);
     }
@@ -196,9 +196,9 @@ void GameCardWidget::mouseDoubleClickEvent(QMouseEvent* event) {
 void GameCardWidget::enterEvent(QEnterEvent* event) {
     if (!selected_) {
         AnimateScaleTo(1.04, 130, QEasingCurve::OutCubic);
-        shadow_->setBlurRadius(20);
-        shadow_->setOffset(0, 6);
-        shadow_->setColor(QColor(0, 0, 0, 100));
+        shadow_->setBlurRadius(24);
+        shadow_->setOffset(0, 8);
+        shadow_->setColor(QColor(0, 0, 0, 110));
         UpdateCoverPixmap(QColor(0, 122, 255, 100));
     }
     QFrame::enterEvent(event);
@@ -207,8 +207,8 @@ void GameCardWidget::enterEvent(QEnterEvent* event) {
 void GameCardWidget::leaveEvent(QEvent* event) {
     if (!selected_) {
         AnimateScaleTo(1.0, 150, QEasingCurve::OutCubic);
-        shadow_->setBlurRadius(12);
-        shadow_->setOffset(0, 4);
+        shadow_->setBlurRadius(14);
+        shadow_->setOffset(0, 5);
         shadow_->setColor(QColor(0, 0, 0, 80));
         UpdateCoverPixmap(Qt::transparent);
     }
@@ -234,9 +234,6 @@ GameGridWidget::GameGridWidget(QWidget* parent) : QScrollArea(parent) {
     container_->setObjectName(QStringLiteral("GameGridContainer"));
     setWidget(container_);
 
-    // Intercetta ogni QEvent::Resize sul viewport — incluso il resize
-    // provocato dal passaggio a fullscreen — per rieseguire il layout
-    // con dimensioni già definitive.
     viewport()->installEventFilter(this);
 }
 
@@ -266,6 +263,7 @@ void GameGridWidget::Clear() {
         card->deleteLater();
     cards_.clear();
     selected_index_ = -1;
+    layout_generation_ = 0;
 }
 
 void GameGridWidget::SelectFirst() {
@@ -314,16 +312,10 @@ void GameGridWidget::resizeEvent(QResizeEvent* event) {
 
 void GameGridWidget::showEvent(QShowEvent* event) {
     QScrollArea::showEvent(event);
-    // Defer: le dimensioni del viewport sono valide solo al prossimo
-    // ciclo dell'event loop (prima apertura o show dopo hide).
     QTimer::singleShot(0, this, &GameGridWidget::RelayoutCards);
 }
 
 // ── RelayoutCards ──────────────────────────────────────────────────────────
-// Comportamento stile Switch: il container è più grande del viewport grazie
-// al padding virtuale (= metà viewport su ogni lato). Lo scroll iniziale
-// viene posizionato al centro del padding così la prima card appare centrata.
-// Quando una card è selezionata, ScrollToSelected la porta al centro.
 
 void GameGridWidget::RelayoutCards() {
     int avail_w = viewport()->width();
@@ -333,8 +325,6 @@ void GameGridWidget::RelayoutCards() {
     const int avail_h = viewport()->height();
     if (avail_h <= 0) return;
 
-    // Padding virtuale = metà viewport: garantisce che qualsiasi card,
-    // anche la prima e l'ultima, possa essere centrata sullo schermo.
     virtual_padding_h_ = avail_w / 2;
     virtual_padding_v_ = avail_h / 2;
 
@@ -351,16 +341,12 @@ void GameGridWidget::RelayoutCards() {
     const int grid_w = cols * kCardW + (cols - 1) * kSpacing;
     const int grid_h = rows * kCardH + qMax(0, rows - 1) * kSpacing;
 
-    // Il container include il padding virtuale su tutti e quattro i lati
-    // più il kPadding estetico.
     const int total_w = 2 * (virtual_padding_h_ + kPadding) + grid_w;
     const int total_h = 2 * (virtual_padding_v_ + kPadding) + grid_h;
 
     container_->setFixedSize(total_w, total_h);
     container_->updateGeometry();
 
-    // Le card partono dopo il padding virtuale + padding estetico,
-    // centrate orizzontalmente nella griglia.
     const int origin_x = virtual_padding_h_ + kPadding;
     const int origin_y = virtual_padding_v_ + kPadding;
 
@@ -371,25 +357,43 @@ void GameGridWidget::RelayoutCards() {
                          origin_y + row * (kCardH + kSpacing));
     }
 
-    // FIX: i range degli scrollbar vengono aggiornati da Qt in modo
-    // asincrono dopo setFixedSize. Schedulare il setValue al ciclo
-    // successivo garantisce che maximum() sia già corretto.
+    ++layout_generation_;
+    const int gen = layout_generation_;
+
     if (selected_index_ < 0) {
-        // Nessuna selezione: porta lo scroll al centro del padding virtuale
-        // così la prima card appare centrata nel viewport.
-        const int target_h = virtual_padding_h_;
-        const int target_v = virtual_padding_v_;
-        QTimer::singleShot(0, this, [this, target_h, target_v]() {
-            horizontalScrollBar()->setValue(target_h);
-            verticalScrollBar()->setValue(target_v);
+        // DOPPIO DEFER: il primo singleShot(0) aspetta che Qt aggiorni
+        // il maximum() degli scrollbar dopo setFixedSize; il secondo
+        // garantisce che anche il primo resize del viewport sia stabile.
+        // Senza il doppio defer le card appaiono a sinistra al primo show.
+        QTimer::singleShot(0, this, [this, gen]() {
+            if (gen != layout_generation_) return; // layout cambiato nel frattempo
+            QTimer::singleShot(0, this, [this, gen]() {
+                if (gen != layout_generation_) return;
+                CenterScrollOnOrigin();
+            });
         });
     } else {
-        QTimer::singleShot(0, this, &GameGridWidget::ScrollToSelected);
+        QTimer::singleShot(0, this, [this, gen]() {
+            if (gen != layout_generation_) return;
+            ScrollToSelected();
+        });
     }
 }
 
+// ── CenterScrollOnOrigin ────────────────────────────────────────────────────
+// Porta lo scroll esattamente al centro del padding virtuale, così la prima
+// card appare centrata nel viewport senza selezione attiva.
+
+void GameGridWidget::CenterScrollOnOrigin() {
+    const int target_h = qBound(0, virtual_padding_h_,
+                                 horizontalScrollBar()->maximum());
+    const int target_v = qBound(0, virtual_padding_v_,
+                                 verticalScrollBar()->maximum());
+    horizontalScrollBar()->setValue(target_h);
+    verticalScrollBar()->setValue(target_v);
+}
+
 // ── ScrollToSelected ────────────────────────────────────────────────────────
-// Centra la card selezionata nel viewport con animazione smooth stile Switch.
 
 void GameGridWidget::ScrollToSelected() {
     if (selected_index_ < 0 ||
@@ -401,11 +405,9 @@ void GameGridWidget::ScrollToSelected() {
     const int vp_w = viewport()->width();
     const int vp_h = viewport()->height();
 
-    // Centro della card nel sistema di coordinate del container
     const int card_cx = card->x() + kCardW / 2;
     const int card_cy = card->y() + kCardH / 2;
 
-    // Scroll target: porta il centro della card al centro del viewport
     const int target_h = card_cx - vp_w / 2;
     const int target_v = card_cy - vp_h / 2;
 

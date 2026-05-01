@@ -50,11 +50,12 @@ private:
     QLabel* title_label_;
     QPixmap raw_cover_;
 
-    static constexpr int kWidth       = 180;
-    static constexpr int kHeight      = 230;
-    static constexpr int kCoverSize   = 156;
-    static constexpr int kCoverRadius = 10;
-    static constexpr int kBorderWidth = 3;
+    // Dimensioni stile Switch: cover quadrata grande, card alta
+    static constexpr int kWidth       = 250;
+    static constexpr int kHeight      = 300;
+    static constexpr int kCoverSize   = 220;
+    static constexpr int kCoverRadius = 12;
+    static constexpr int kBorderWidth = 4;
 };
 
 // -------------------------------------------------------
@@ -96,24 +97,26 @@ protected:
 private:
     void UpdateSelection(int new_index);
     void ScrollToSelected();
+    void CenterScrollOnOrigin();
 
     QWidget* container_;
     std::vector<GameCardWidget*> cards_;
     int selected_index_ = -1;
     int last_cols_      = 1;
 
-    // Animazioni scroll smooth stile Switch
     QPointer<QVariantAnimation> scroll_anim_h_;
     QPointer<QVariantAnimation> scroll_anim_v_;
 
-    // Padding virtuale: aggiunto su ogni lato del container così la card
-    // selezionata può sempre essere centrata anche ai bordi della griglia.
-    // Calcolato runtime in RelayoutCards (= metà viewport).
     int virtual_padding_h_ = 0;
     int virtual_padding_v_ = 0;
 
-    static constexpr int kCardW   = 160;
-    static constexpr int kCardH   = 210;
-    static constexpr int kSpacing = 16;
-    static constexpr int kPadding = 20;
+    // Quante volte abbiamo già eseguito il layout (usato per il
+    // doppio-defer allo startup: il primo ciclo aggiorna il container,
+    // il secondo aggiorna i range degli scrollbar).
+    int layout_generation_ = 0;
+
+    static constexpr int kCardW   = 230;   // deve matchare kWidth - margini card
+    static constexpr int kCardH   = 280;   // deve matchare kHeight - margini card
+    static constexpr int kSpacing = 24;
+    static constexpr int kPadding = 28;
 };

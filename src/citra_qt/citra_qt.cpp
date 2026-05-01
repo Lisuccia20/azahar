@@ -1607,9 +1607,8 @@ void GMainWindow::ShutdownGame() {
     if (streamer_connected) {
         if (auto remote = InputCommon::GetRemoteSwitch()) {
             remote->SetNavigationCallback([this](int button_id, bool pressed) {
-                if (!pressed) return;
-                QMetaObject::invokeMethod(this, [this, button_id]() {
-                    OnRemoteSwitchButton(button_id);
+                QMetaObject::invokeMethod(this, [this, button_id, pressed]() {
+                    OnRemoteSwitchButton(button_id, pressed);
                 }, Qt::QueuedConnection);
             });
             remote->SetStickCallback([this](float x, float y) {
@@ -4168,9 +4167,8 @@ void GMainWindow::OnStreamerConnected() {
     // Collega navigazione RemoteSwitch → GameList (thread-safe)
     if (auto remote = InputCommon::GetRemoteSwitch()) {
         remote->SetNavigationCallback([this](int button_id, bool pressed) {
-            if (!pressed) return;
-            QMetaObject::invokeMethod(this, [this, button_id]() {
-                OnRemoteSwitchButton(button_id);
+            QMetaObject::invokeMethod(this, [this, button_id, pressed]() {
+                OnRemoteSwitchButton(button_id, pressed);
             }, Qt::QueuedConnection);
         });
         remote->SetStickCallback([this](float x, float y) {
@@ -4199,9 +4197,24 @@ void GMainWindow::OnStreamerDisconnected() {
 // L=6, R=7, ZL=8(?), ZR=9(?), +/Start=10, -/Select=11
 // DPad Su=12, Giù=13, Sinistra=14, Destra=15
 // (verifica con il debug se i tuoi ID differiscono)
-void GMainWindow::OnRemoteSwitchButton(int button_id) {
+void GMainWindow::OnRemoteSwitchButton(int button_id, bool pressed) {
     if (game_list->CurrentViewMode() != GameList::ViewMode::Grid)
         return;
+
+    if (pressed) {
+        remote_buttons_held_.insert(button_id);
+    } else {
+        remote_buttons_held_.erase(button_id);
+        return; // i release non triggerano azioni
+    }
+
+    if (emulation_running) {
+        // ZL(6) + Plus(10) → torna alla lista
+        if (button_id == 6 && remote_buttons_held_.contains(8)) {
+            OnStopGame();
+        }
+        return;
+    }
 
     switch (button_id) {
     case 0:  // A → avvia
