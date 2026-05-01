@@ -4205,9 +4205,9 @@ void GMainWindow::OnRemoteSwitchButton(int button_id, bool pressed) {
         return;
 
     if (pressed) {
-        remote_buttons_held_.insert(button_id);
+        remote_buttons_held.insert(button_id);
     } else {
-        remote_buttons_held_.erase(button_id);
+        remote_buttons_held.erase(button_id);
         return; // i release non triggerano azioni
     }
     switch (button_id) {
