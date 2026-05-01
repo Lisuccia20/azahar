@@ -571,8 +571,8 @@ void ScreenStreamer::handleButton(uint8_t type, uint8_t id, int8_t value) {
 void ScreenStreamer::handleStick(int16_t lx, int16_t ly, int16_t rx, int16_t ry) {
     auto remote = InputCommon::GetRemoteSwitch();
     if (remote) {
-        remote->SetStickState(lx / 32767.0f, ly / 32767.0f);
-        remote->SetStickState(rx / 32767.0f, ry / 32767.0f);
+        remote->SetStickState(lx / 32767.0f, ly / 32767.0f, 0);
+        remote->SetStickState(rx / 32767.0f, ry / 32767.0f, 1);
     }
 }
 
@@ -751,7 +751,7 @@ ScreenStreamer::ScreenStreamer(uint16_t port, Core::System* system)
                 if (buf[0] == 0x03) {
                     StickPacket p;
                     memcpy(&p, buf, sizeof(p));
-                    handleStick(p.lx, p.ly);
+                    handleStick(p.lx, p.ly, p.rx, p.ry);
                 } else {
                     TouchPacket p;
                     memcpy(&p, buf, sizeof(p));

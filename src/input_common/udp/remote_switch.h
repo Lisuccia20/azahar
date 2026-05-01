@@ -80,9 +80,9 @@ public:
         if (nav_callback) nav_callback(id, pressed);
     }
 
-    void SetStickState(float x, float y) {
-        if (analog) analog->UpdateStatus(x, y);
-        if (stick_callback) stick_callback(x, y);
+    void SetStickState(float x, float y, int id = 0) {
+        if (id >= 0 && id < static_cast<int>(analogs.size()) && analogs[id])
+            analogs[id]->UpdateStatus(x, y);
     }
 
     std::shared_ptr<RemoteButton> GetOrCreateButton(int id) {
@@ -91,9 +91,10 @@ public:
         return buttons[id];
     }
 
-    std::shared_ptr<RemoteAnalog> GetOrCreateAnalog() {
-        if (!analog) analog = std::make_shared<RemoteAnalog>();
-        return analog;
+    std::shared_ptr<RemoteAnalog> GetOrCreateAnalog(int id = 0) {
+        if (id >= static_cast<int>(analogs.size())) analogs.resize(id + 1);
+        if (!analogs[id]) analogs[id] = std::make_shared<RemoteAnalog>();
+        return analogs[id];
     }
 
     // Callback navigazione: chiamato dal thread UDP su ogni button change
@@ -108,7 +109,7 @@ public:
 
 private:
     std::vector<std::shared_ptr<RemoteButton>> buttons;
-    std::shared_ptr<RemoteAnalog> analog;
+    std::vector<std::shared_ptr<RemoteAnalog>> analogs;
     std::function<void(int, bool)> nav_callback;
     std::function<void(float, float)> stick_callback;
 };
@@ -141,17 +142,20 @@ private:
 class RemoteAnalogFactory : public Input::Factory<Input::AnalogDevice>,
                             public Polling::DevicePoller {
 public:
-    explicit RemoteAnalogFactory(std::shared_ptr<RemoteSwitch> parent)
-        : switch_ptr(std::move(parent)) {}
+    explicit RemoteAnalogFactory(std::shared_ptr<RemoteSwitch> parent, int analog_id = 0)
+        : switch_ptr(std::move(parent)), analog_id(analog_id) {}
+
     std::unique_ptr<Input::AnalogDevice> Create(const Common::ParamPackage& params) override;
 
     void Start() override {}
     void Stop() override {}
+
     Common::ParamPackage GetNextInput() override {
-        auto status = switch_ptr->GetOrCreateAnalog()->GetStatus();
+        auto status = switch_ptr->GetOrCreateAnalog(analog_id)->GetStatus();
         if (std::abs(std::get<0>(status)) > 0.5f || std::abs(std::get<1>(status)) > 0.5f) {
             Common::ParamPackage params;
             params.Set("engine", "remote_switch");
+            params.Set("analog_id", analog_id);
             params.Set("axis_x", 0);
             params.Set("axis_y", 1);
             return params;
@@ -161,6 +165,7 @@ public:
 
 private:
     std::shared_ptr<RemoteSwitch> switch_ptr;
+    int analog_id;
 };
 
 } // namespace InputCommon

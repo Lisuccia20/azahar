@@ -87,7 +87,7 @@ private:
     // Metodi interni per la ricezione dell'input (mantiene la logica Citra)
     void handleTouch(uint8_t type, uint16_t x, uint16_t y);
     void handleButton(uint8_t type, uint8_t id, int8_t value);
-    void handleStick(int16_t lx, int16_t ly);
+    void handleStick(int16_t lx, int16_t ly, int16_t rx, int16_t ry);
 
     // --- Modalità RTP Diretta (Nintendo Switch Fallback) ---
     std::atomic<bool> directMode{false};

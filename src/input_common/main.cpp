@@ -122,7 +122,10 @@ std::vector<std::unique_ptr<DevicePoller>> GetPollers(DeviceType type) {
     std::vector<std::unique_ptr<DevicePoller>> pollers;
     if (remote_switch) {
         if (type == DeviceType::Button) pollers.push_back(std::make_unique<RemoteButtonFactory>(remote_switch));
-        else if (type == DeviceType::Analog) pollers.push_back(std::make_unique<RemoteAnalogFactory>(remote_switch));
+         else if (type == DeviceType::Analog) {
+            pollers.push_back(std::make_unique<RemoteAnalogFactory>(remote_switch, 0)); // circle pad
+            pollers.push_back(std::make_unique<RemoteAnalogFactory>(remote_switch, 1)); // c-stick
+        }
     }
     if (sdl) {
         auto sdl_pollers = sdl->GetPollers(type);
