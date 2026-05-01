@@ -9,6 +9,7 @@
 #include "common/settings.h"
 #include "core/frontend/framebuffer_layout.h"
 #include <functional>
+#include <set>
 
 #ifdef _WIN32
   #include <winsock2.h>
@@ -62,9 +63,10 @@ public:
 
     bool IsDirectMode() const { return directMode; }
     std::string directSourceFormat = "RGBA";
-
+    void SetOnStopCallback(std::function<void()> cb) { on_stop_callback = std::move(cb); }
 private:
-
+ std::set<int> buttons_held_;
+    std::function<void()> on_stop_callback;
   std::function<void()> on_connected_callback;
     std::function<void()> on_disconnected_callback;
     Settings::LayoutOption previous_layout = Settings::LayoutOption::Default;

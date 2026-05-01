@@ -12,8 +12,9 @@
 #include <gst/sdp/sdp.h>
 #include <gst/video/video.h>
 #include "common/settings.h"
-
-#include <sys/sysctl.h>
+#ifdef __APPLE__
+    #include <sys/sysctl.h>
+#endif
 #include <atomic>
 #include <thread>
 #include <iostream>
@@ -87,7 +88,6 @@ static std::string getLocalIP() {
 
 static std::string getDeviceFriendlyName() {
 #if defined(__APPLE__)
- // <-- metti questo in cima al file insieme agli altri include
     char model[128] = {};
     size_t size = sizeof(model);
     if (sysctlbyname("hw.model", model, &size, nullptr, 0) == 0)
@@ -95,28 +95,18 @@ static std::string getDeviceFriendlyName() {
     return "Mac";
 
 #elif defined(_WIN32)
-    // Registry: HKLM\SYSTEM\HardwareConfig\Current -> SystemProductName
-    HKEY hKey;
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
-        "SYSTEM\\HardwareConfig\\Current", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
-        return "PC";
-
-    char buf[256] = {};
-    DWORD size = sizeof(buf);
-    RegQueryValueExA(hKey, "SystemProductName", nullptr, nullptr,
-                     (LPBYTE)buf, &size);
-    RegCloseKey(hKey);
-    return std::string(buf[0] ? buf : "PC");
-
+    char winuser[256] = {};
+    DWORD size = sizeof(winuser);
+    if (GetUserNameA(winuser, &size) && winuser[0])
+        return std::string(winuser);
+    return "PC";
 #else
-    // Linux: legge /sys/class/dmi/id/product_name
     std::ifstream f("/sys/class/dmi/id/product_name");
     if (f) {
         std::string name;
         std::getline(f, name);
         if (!name.empty()) return name;
     }
-    // Fallback: hostname
     char buf[128] = {};
     gethostname(buf, sizeof(buf));
     return std::string(buf[0] ? buf : "Linux");
@@ -231,7 +221,6 @@ void ScreenStreamer::handleOffer(const std::string& sdp) {
 
     GstSDPMessage* msg = nullptr;
     if (gst_sdp_message_new_from_text(sdp.c_str(), &msg) != GST_SDP_OK) return;
-
     auto* offer = gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_OFFER, msg);
     answer_pending = true;
     GstPromise* p = gst_promise_new_with_change_func(on_remote_desc_set, this, nullptr);
@@ -604,6 +593,17 @@ void ScreenStreamer::handleTouch(uint8_t type, uint16_t x, uint16_t y) {
 
 void ScreenStreamer::handleButton(uint8_t type, uint8_t id, int8_t value) {
     if (type != 0) return;
+
+    if (value) buttons_held_.insert(id);
+    else        buttons_held_.erase(id);
+
+    // ZL(6) + Plus(8) → stop, intercetta prima del RemoteSwitch
+    if (buttons_held_.contains(6) && buttons_held_.contains(8)) {
+        buttons_held_.clear();
+        if (on_stop_callback) on_stop_callback();
+        return; // non propagare al gioco
+    }
+
     auto remote = InputCommon::GetRemoteSwitch();
     if (remote) remote->SetButtonState(id, value != 0);
 }

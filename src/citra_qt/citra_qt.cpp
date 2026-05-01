@@ -422,6 +422,9 @@ GMainWindow::GMainWindow(Core::System& system_)
         streamer->SetOnDisconnectedCallback([this]() {
             QMetaObject::invokeMethod(this, "OnStreamerDisconnected", Qt::QueuedConnection);
         });
+        streamer->SetOnStopCallback([this]() {
+            QMetaObject::invokeMethod(this, "OnStopGame", Qt::QueuedConnection);
+        });
     } else {
         std::cerr << "[Theme] ScreenStreamer è null — callback tema non collegati\n";
     }
@@ -1619,7 +1622,7 @@ void GMainWindow::ShutdownGame() {
         }
     }
 
-    if (ui->action_Fullscreen->isChecked()) {
+    if (ui->action_Fullscreen->isChecked() && !streamer_connected) {
         HideFullscreen();
     }
 
@@ -4198,6 +4201,10 @@ void GMainWindow::OnStreamerDisconnected() {
 // DPad Su=12, Giù=13, Sinistra=14, Destra=15
 // (verifica con il debug se i tuoi ID differiscono)
 void GMainWindow::OnRemoteSwitchButton(int button_id, bool pressed) {
+    std::cerr << "[Remote] button_id=" << button_id << " pressed=" << pressed
+              << " held={";
+    for (int b : remote_buttons_held_) std::cerr << b << ",";
+    std::cerr << "}\n";
     if (game_list->CurrentViewMode() != GameList::ViewMode::Grid)
         return;
 
@@ -4209,13 +4216,12 @@ void GMainWindow::OnRemoteSwitchButton(int button_id, bool pressed) {
     }
 
     if (emulation_running) {
-        // ZL(6) + Plus(10) → torna alla lista
-        if (button_id == 6 && remote_buttons_held_.contains(8)) {
+        if (remote_buttons_held_.contains(6) && remote_buttons_held_.contains(8)) {
+            std::cerr << 'prova';
             OnStopGame();
         }
         return;
     }
-
     switch (button_id) {
     case 0:  // A → avvia
         game_list->ActivateGridSelection();
