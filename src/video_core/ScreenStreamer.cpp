@@ -144,7 +144,6 @@ static void startDiscovery(uint16_t /*sigPort*/) {
 
         while (discoveryRunning) {
             std::string payload = "WBRT_HERE|" + getDeviceFriendlyName();
-            sendto(s, payload.data(), (int)payload.size(), 0, (sockaddr*)&bcast255,    sizeof(bcast255));
             sendto(s, payload.data(), (int)payload.size(), 0, (sockaddr*)&bcastSubnet, sizeof(bcastSubnet));
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }

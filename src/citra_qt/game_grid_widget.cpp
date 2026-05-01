@@ -328,19 +328,16 @@ void GameGridWidget::RelayoutCards() {
     virtual_padding_h_ = avail_w / 2;
     virtual_padding_v_ = avail_h / 2;
 
-    const int n    = static_cast<int>(visible.size());
-    const int cols = qMax(1, n);
-    last_cols_ = cols;
-
     std::vector<GameCardWidget*> visible;
     for (auto* c : cards_)
         if (c->isVisible()) visible.push_back(c);
 
     const int n    = static_cast<int>(visible.size());
-    const int rows = n == 0 ? 0 : (n + cols - 1) / cols;
+    const int cols = qMax(1, n);
+    last_cols_ = cols;
 
     const int grid_w = cols * kCardW + (cols - 1) * kSpacing;
-    const int grid_h = rows * kCardH + qMax(0, rows - 1) * kSpacing;
+    const int grid_h = kCardH;
 
     const int total_w = 2 * (virtual_padding_h_ + kPadding) + grid_w;
     const int total_h = 2 * (virtual_padding_v_ + kPadding) + grid_h;
@@ -351,34 +348,19 @@ void GameGridWidget::RelayoutCards() {
     const int origin_x = virtual_padding_h_ + kPadding;
     const int origin_y = virtual_padding_v_ + kPadding;
 
-    for (int i = 0; i < n; ++i) {
-        const int col = i % cols;
-        const int row = i / cols;
-        visible[i]->move(origin_x + col * (kCardW + kSpacing),
-                         origin_y + row * (kCardH + kSpacing));
-    }
+    for (int i = 0; i < n; ++i)
+        visible[i]->move(origin_x + i * (kCardW + kSpacing), origin_y);
+
+    if (selected_index_ < 0 && n > 0)
+        UpdateSelection(0);
 
     ++layout_generation_;
     const int gen = layout_generation_;
 
-    if (selected_index_ < 0) {
-        // DOPPIO DEFER: il primo singleShot(0) aspetta che Qt aggiorni
-        // il maximum() degli scrollbar dopo setFixedSize; il secondo
-        // garantisce che anche il primo resize del viewport sia stabile.
-        // Senza il doppio defer le card appaiono a sinistra al primo show.
-        QTimer::singleShot(0, this, [this, gen]() {
-            if (gen != layout_generation_) return; // layout cambiato nel frattempo
-            QTimer::singleShot(0, this, [this, gen]() {
-                if (gen != layout_generation_) return;
-                CenterScrollOnOrigin();
-            });
-        });
-    } else {
-        QTimer::singleShot(0, this, [this, gen]() {
-            if (gen != layout_generation_) return;
-            ScrollToSelected();
-        });
-    }
+    QTimer::singleShot(50, this, [this, gen]() {
+        if (gen != layout_generation_) return;
+        ScrollToSelected();
+    });
 }
 
 // ── CenterScrollOnOrigin ────────────────────────────────────────────────────
