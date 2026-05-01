@@ -4201,10 +4201,6 @@ void GMainWindow::OnStreamerDisconnected() {
 // DPad Su=12, Giù=13, Sinistra=14, Destra=15
 // (verifica con il debug se i tuoi ID differiscono)
 void GMainWindow::OnRemoteSwitchButton(int button_id, bool pressed) {
-    std::cerr << "[Remote] button_id=" << button_id << " pressed=" << pressed
-              << " held={";
-    for (int b : remote_buttons_held_) std::cerr << b << ",";
-    std::cerr << "}\n";
     if (game_list->CurrentViewMode() != GameList::ViewMode::Grid)
         return;
 
@@ -4213,14 +4209,6 @@ void GMainWindow::OnRemoteSwitchButton(int button_id, bool pressed) {
     } else {
         remote_buttons_held_.erase(button_id);
         return; // i release non triggerano azioni
-    }
-
-    if (emulation_running) {
-        if (remote_buttons_held_.contains(6) && remote_buttons_held_.contains(8)) {
-            std::cerr << 'prova';
-            OnStopGame();
-        }
-        return;
     }
     switch (button_id) {
     case 0:  // A → avvia

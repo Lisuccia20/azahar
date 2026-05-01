@@ -27,6 +27,7 @@
 #include "core/core.h"
 #include "core/savestate.h"
 #include "video_core/rasterizer_interface.h"
+#include <unordered_set>
 
 // Needs to be included at the end due to https://bugreports.qt.io/browse/QTBUG-73263
 #include <filesystem>
@@ -160,7 +161,7 @@ private:
     std::chrono::steady_clock::time_point last_stick_nav_time_;
         bool streamer_connected = false;
 
-    std::unordered_set<int> remote_buttons_held_;
+    std::unordered_set<int> remote_buttons_held;
     void InitializeWidgets();
     void InitializeDebugWidgets();
     void InitializeRecentFileMenuActions();
