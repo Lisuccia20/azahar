@@ -422,7 +422,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     if (encoder_name == std::string("vtenc_h264")) {
         // --- Configurazione Apple (VideoToolbox) ---
         g_object_set(enc,
-                    "bitrate", 1500,
+                    "bitrate", 2000,
                     "allow-frame-reordering", FALSE, // Fondamentale per latenza (no B-frames)
                     "realtime", TRUE,
                     "max-keyframe-interval", 60,
@@ -431,14 +431,14 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
     else if (encoder_name == std::string("vaapih264enc")) {
         // --- Configurazione Linux (VA-API / Steam Deck) ---
         g_object_set(enc,
-                    "bitrate", 1500,
+                    "bitrate", 2000,
                     nullptr);
         gst_util_set_object_arg(G_OBJECT(enc), "rate-control", "cbr");
     }
     else if (encoder_name == std::string("d3d11h264enc")) {
         // --- Configurazione Windows (D3D11) ---
         g_object_set(enc,
-                    "bitrate", 1500,
+                    "bitrate", 2000,
                     "gop-size", 30,
                     nullptr);
         gst_util_set_object_arg(G_OBJECT(enc), "rc-mode", "cbr");

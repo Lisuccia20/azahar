@@ -533,6 +533,7 @@ void GameList::DonePopulating(const QStringList& watch_list) {
     }
     tree_view->header()->setStretchLastSection(true);
 
+    RebuildGridFromModel();
     emit PopulatingCompleted();
 }
 
@@ -1344,5 +1345,46 @@ QModelIndex GameList::GetFirstGameIndex() const {
 void GameList::RefreshLayout() {
     if (grid_view && current_view_mode_ == ViewMode::Grid) {
         grid_view->RelayoutCards();
+    }
+}
+
+void GameList::RebuildGridFromModel() {
+    if (!grid_view) return;
+
+    grid_view->Clear();
+
+    const int folder_count = item_model->rowCount();
+    // i=0 è la riga Favorites — la saltiamo per evitare duplicati.
+    // L'ultima riga è GameListAddDir — la saltiamo perché non è un gioco.
+    for (int i = 1; i < folder_count - 1; ++i) {
+        const QStandardItem* folder = item_model->item(i, 0);
+        if (!folder) continue;
+
+        const int children_count = folder->rowCount();
+        for (int j = 0; j < children_count; ++j) {
+            const QStandardItem* child = folder->child(j, 0);
+            if (!child) continue;
+
+            const QString path =
+                child->data(GameListItemPath::FullPathRole).toString();
+            if (path.isEmpty()) continue;
+
+            const QString title =
+                child->data(GameListItemPath::LongTitleRole).toString();
+            const QString display =
+                title.isEmpty()
+                    ? QFileInfo(path).completeBaseName()
+                    : title;
+
+            // L'icona è stored come QPixmap nel DecorationRole
+            QPixmap cover;
+            const QVariant icon_var = child->data(Qt::DecorationRole);
+            if (icon_var.canConvert<QIcon>())
+                cover = icon_var.value<QIcon>().pixmap(256, 256);
+            else if (icon_var.canConvert<QPixmap>())
+                cover = icon_var.value<QPixmap>();
+
+            grid_view->AddGame(display, path, cover);
+        }
     }
 }

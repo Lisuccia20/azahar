@@ -1,9 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024 Azahar Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-
 #include "citra_qt/game_grid_widget.h"
-
 
 #include <QApplication>
 #include <QContextMenuEvent>
@@ -16,14 +14,12 @@
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QStyle>
-#include <QTimer>        // FIX #1: aggiunto per QTimer::singleShot
+#include <QTimer>
 #include <QVBoxLayout>
-
 
 // ============================================================
 //  GameCardWidget
 // ============================================================
-
 
 GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
                                const QPixmap& cover, QWidget* parent)
@@ -33,29 +29,20 @@ GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
     setFixedSize(kWidth, kHeight);
     setCursor(Qt::PointingHandCursor);
     setFocusPolicy(Qt::StrongFocus);
-
-
-    // Rounded corners tramite stylesheet — la card stessa è un rettangolo arrotondato
     setAttribute(Qt::WA_TranslucentBackground, false);
-
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(12, 12, 12, 10);
     layout->setSpacing(8);
     layout->setAlignment(Qt::AlignHCenter);
 
-
     // ── Cover ──────────────────────────────────────────────────────────────
     cover_label_ = new QLabel(this);
     cover_label_->setFixedSize(kCoverSize, kCoverSize);
     cover_label_->setAlignment(Qt::AlignCenter);
     cover_label_->setScaledContents(false);
-    // Nessuno stylesheet — rounded corner e border vengono disegnati
-    // direttamente sul pixmap in UpdateCoverPixmap()
-
 
     if (!cover.isNull()) {
-        // Scala e crop al centro per riempire il quadrato
         QPixmap scaled = cover.scaled(kCoverSize, kCoverSize,
                                       Qt::KeepAspectRatioByExpanding,
                                       Qt::SmoothTransformation);
@@ -66,9 +53,7 @@ GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
         }
         raw_cover_ = scaled;
     }
-    // Disegna la cover con bordo trasparente (stato iniziale)
     UpdateCoverPixmap(Qt::transparent);
-
 
     // ── Titolo ─────────────────────────────────────────────────────────────
     title_label_ = new QLabel(this);
@@ -78,11 +63,9 @@ GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
     QFontMetrics fm(title_label_->font());
     title_label_->setText(fm.elidedText(title, Qt::ElideRight, kWidth - 24));
 
-
     layout->addWidget(cover_label_, 0, Qt::AlignHCenter);
     layout->addWidget(title_label_, 0, Qt::AlignHCenter);
     layout->addStretch();
-
 
     // ── Ombra ──────────────────────────────────────────────────────────────
     shadow_ = new QGraphicsDropShadowEffect(this);
@@ -92,31 +75,22 @@ GameCardWidget::GameCardWidget(const QString& title, const QString& filepath,
     setGraphicsEffect(shadow_);
 }
 
-
 // ── UpdateCoverPixmap ──────────────────────────────────────────────────────
-// Ridisegna il pixmap della cover con rounded corners e un bordo colorato.
-// border_color può essere Qt::transparent per lo stato normale.
-
 
 void GameCardWidget::UpdateCoverPixmap(const QColor& border_color) {
-    const int sz = kCoverSize;
+    const int sz  = kCoverSize;
     const qreal r = kCoverRadius;
     const int   bw = kBorderWidth;
-
 
     QPixmap result(sz, sz);
     result.fill(Qt::transparent);
     QPainter p(&result);
     p.setRenderHint(QPainter::Antialiasing);
 
-
-    // 1. Sfondo scuro arrotondato (visibile solo se non c'è cover)
     p.setBrush(QColor(0x1e, 0x1e, 0x2e));
     p.setPen(Qt::NoPen);
     p.drawRoundedRect(0, 0, sz, sz, r, r);
 
-
-    // 2. Immagine clippata agli angoli arrotondati (al netto del border)
     if (!raw_cover_.isNull()) {
         const qreal inner = r - bw * 0.5;
         QPainterPath clip;
@@ -126,36 +100,25 @@ void GameCardWidget::UpdateCoverPixmap(const QColor& border_color) {
         p.setClipping(false);
     }
 
-
-    // 3. Bordo arrotondato sopra l'immagine
     if (border_color != Qt::transparent && border_color.alpha() > 0) {
         p.setBrush(Qt::NoBrush);
         QPen pen(border_color, bw);
         pen.setJoinStyle(Qt::RoundJoin);
         p.setPen(pen);
-        // offset di bw/2 per centrare il tratto sul perimetro
         const qreal half = bw / 2.0;
         p.drawRoundedRect(QRectF(half, half, sz - bw, sz - bw), r, r);
     }
 
-
     cover_label_->setPixmap(result);
 }
-
-
-
 
 void GameCardWidget::AnimateScaleTo(qreal target, int duration_ms,
                                     QEasingCurve::Type easing)
 {
-    if (!active_anim_.isNull()) {
+    if (!active_anim_.isNull())
         active_anim_->stop();
-        // QPointer si azzera automaticamente dopo DeleteWhenStopped
-    }
-
 
     if (qFuzzyCompare(current_scale_, target)) return;
-
 
     auto* anim = new QVariantAnimation(this);
     anim->setDuration(duration_ms);
@@ -163,26 +126,21 @@ void GameCardWidget::AnimateScaleTo(qreal target, int duration_ms,
     anim->setStartValue(current_scale_);
     anim->setEndValue(target);
 
-
     connect(anim, &QVariantAnimation::valueChanged, this,
         [this](const QVariant& val) {
             current_scale_ = val.toReal();
             update();
         });
 
-
     active_anim_ = anim;
     anim->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
-
 // ── SetSelected ────────────────────────────────────────────────────────────
-
 
 void GameCardWidget::SetSelected(bool selected) {
     if (selected_ == selected) return;
     selected_ = selected;
-
 
     if (selected) {
         AnimateScaleTo(1.08, 200, QEasingCurve::OutBack);
@@ -200,9 +158,7 @@ void GameCardWidget::SetSelected(bool selected) {
     update();
 }
 
-
 // ── paintEvent ─────────────────────────────────────────────────────────────
-
 
 void GameCardWidget::paintEvent(QPaintEvent* event) {
     if (qFuzzyCompare(current_scale_, 1.0)) {
@@ -210,11 +166,8 @@ void GameCardWidget::paintEvent(QPaintEvent* event) {
         return;
     }
 
-
-    // Scala dal centro della card senza spostare il widget nel layout
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-
 
     const QPointF center(width() / 2.0, height() / 2.0);
     QTransform t;
@@ -223,13 +176,10 @@ void GameCardWidget::paintEvent(QPaintEvent* event) {
     t.translate(-center.x(), -center.y());
     painter.setTransform(t);
 
-
     QFrame::paintEvent(event);
 }
 
-
 // ── Mouse & hover events ───────────────────────────────────────────────────
-
 
 void GameCardWidget::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton)
@@ -237,13 +187,11 @@ void GameCardWidget::mousePressEvent(QMouseEvent* event) {
     QFrame::mousePressEvent(event);
 }
 
-
 void GameCardWidget::mouseDoubleClickEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton)
         emit Activated(filepath_);
     QFrame::mouseDoubleClickEvent(event);
 }
-
 
 void GameCardWidget::enterEvent(QEnterEvent* event) {
     if (!selected_) {
@@ -256,7 +204,6 @@ void GameCardWidget::enterEvent(QEnterEvent* event) {
     QFrame::enterEvent(event);
 }
 
-
 void GameCardWidget::leaveEvent(QEvent* event) {
     if (!selected_) {
         AnimateScaleTo(1.0, 150, QEasingCurve::OutCubic);
@@ -268,16 +215,13 @@ void GameCardWidget::leaveEvent(QEvent* event) {
     QFrame::leaveEvent(event);
 }
 
-
 void GameCardWidget::contextMenuEvent(QContextMenuEvent* event) {
     emit ContextMenuRequested(filepath_, event->globalPos());
 }
 
-
 // ============================================================
 //  GameGridWidget
 // ============================================================
-
 
 GameGridWidget::GameGridWidget(QWidget* parent) : QScrollArea(parent) {
     setObjectName(QStringLiteral("GameGrid"));
@@ -286,25 +230,36 @@ GameGridWidget::GameGridWidget(QWidget* parent) : QScrollArea(parent) {
     setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     setFrameShape(QFrame::NoFrame);
 
-
     container_ = new QWidget(this);
     container_->setObjectName(QStringLiteral("GameGridContainer"));
     setWidget(container_);
+
+    // Intercetta ogni QEvent::Resize sul viewport — incluso il resize
+    // provocato dal passaggio a fullscreen — per rieseguire il layout
+    // con dimensioni già definitive.
+    viewport()->installEventFilter(this);
 }
 
+// ── eventFilter ────────────────────────────────────────────────────────────
+
+bool GameGridWidget::eventFilter(QObject* obj, QEvent* event) {
+    if (obj == viewport() && event->type() == QEvent::Resize)
+        RelayoutCards();
+    return QScrollArea::eventFilter(obj, event);
+}
 
 void GameGridWidget::AddGame(const QString& title, const QString& filepath,
                              const QPixmap& cover)
 {
     auto* card = new GameCardWidget(title, filepath, cover, container_);
-    connect(card, &GameCardWidget::Activated, this, &GameGridWidget::GameActivated);
+    connect(card, &GameCardWidget::Activated,
+            this, &GameGridWidget::GameActivated);
     connect(card, &GameCardWidget::ContextMenuRequested,
             this, &GameGridWidget::GameContextMenuRequested);
     cards_.push_back(card);
     card->show();
     RelayoutCards();
 }
-
 
 void GameGridWidget::Clear() {
     for (auto* card : cards_)
@@ -313,22 +268,18 @@ void GameGridWidget::Clear() {
     selected_index_ = -1;
 }
 
-
 void GameGridWidget::SelectFirst() {
     if (cards_.empty()) return;
     UpdateSelection(0);
     ScrollToSelected();
 }
 
-
 void GameGridWidget::NavigateBy(int delta) {
     if (cards_.empty()) return;
-
 
     const int dir   = delta > 0 ? 1 : -1;
     int       steps = std::abs(delta);
     int       next  = selected_index_;
-
 
     while (steps > 0) {
         int candidate = next + dir;
@@ -339,13 +290,11 @@ void GameGridWidget::NavigateBy(int delta) {
             --steps;
     }
 
-
     if (next != selected_index_ && cards_[next]->isVisible()) {
         UpdateSelection(next);
         ScrollToSelected();
     }
 }
-
 
 void GameGridWidget::ApplyFilter(const QString& text) {
     const QString lower = text.toLower();
@@ -358,120 +307,120 @@ void GameGridWidget::ApplyFilter(const QString& text) {
     RelayoutCards();
 }
 
-
 void GameGridWidget::resizeEvent(QResizeEvent* event) {
     QScrollArea::resizeEvent(event);
     RelayoutCards();
 }
 
+void GameGridWidget::showEvent(QShowEvent* event) {
+    QScrollArea::showEvent(event);
+    // Defer: le dimensioni del viewport sono valide solo al prossimo
+    // ciclo dell'event loop (prima apertura o show dopo hide).
+    QTimer::singleShot(0, this, &GameGridWidget::RelayoutCards);
+}
+
+// ── RelayoutCards ──────────────────────────────────────────────────────────
+// Comportamento stile Switch: il container è più grande del viewport grazie
+// al padding virtuale (= metà viewport su ogni lato). Lo scroll iniziale
+// viene posizionato al centro del padding così la prima card appare centrata.
+// Quando una card è selezionata, ScrollToSelected la porta al centro.
 
 void GameGridWidget::RelayoutCards() {
     int avail_w = viewport()->width();
     if (avail_w <= 0) avail_w = width();
     if (avail_w <= 0) return;
 
-
     const int avail_h = viewport()->height();
-
+    if (avail_h <= 0) return;
 
     // Padding virtuale = metà viewport: garantisce che qualsiasi card,
     // anche la prima e l'ultima, possa essere centrata sullo schermo.
     virtual_padding_h_ = avail_w / 2;
     virtual_padding_v_ = avail_h / 2;
 
-
     const int cols = qMax(1, (avail_w - 2 * kPadding + kSpacing) / (kCardW + kSpacing));
     last_cols_ = cols;
-
 
     std::vector<GameCardWidget*> visible;
     for (auto* c : cards_)
         if (c->isVisible()) visible.push_back(c);
 
+    const int n    = static_cast<int>(visible.size());
+    const int rows = n == 0 ? 0 : (n + cols - 1) / cols;
 
-    const int rows      = visible.empty() ? 0
-                        : (static_cast<int>(visible.size()) + cols - 1) / cols;
-    const int content_w = cols * kCardW + (cols - 1) * kSpacing;
-    const int content_h = rows * kCardH + qMax(0, rows - 1) * kSpacing;
-
+    const int grid_w = cols * kCardW + (cols - 1) * kSpacing;
+    const int grid_h = rows * kCardH + qMax(0, rows - 1) * kSpacing;
 
     // Il container include il padding virtuale su tutti e quattro i lati
-    // più il kPadding estetico. Le card vengono posizionate a partire da
-    // (virtual_padding_h_ + kPadding, virtual_padding_v_ + kPadding).
-    const int total_w = 2 * (virtual_padding_h_ + kPadding) + content_w;
-    const int total_h = 2 * (virtual_padding_v_ + kPadding) + content_h;
-
+    // più il kPadding estetico.
+    const int total_w = 2 * (virtual_padding_h_ + kPadding) + grid_w;
+    const int total_h = 2 * (virtual_padding_v_ + kPadding) + grid_h;
 
     container_->setFixedSize(total_w, total_h);
+    container_->updateGeometry();
 
-
+    // Le card partono dopo il padding virtuale + padding estetico,
+    // centrate orizzontalmente nella griglia.
     const int origin_x = virtual_padding_h_ + kPadding;
     const int origin_y = virtual_padding_v_ + kPadding;
 
-
-    for (int i = 0; i < static_cast<int>(visible.size()); ++i) {
+    for (int i = 0; i < n; ++i) {
         const int col = i % cols;
         const int row = i / cols;
         visible[i]->move(origin_x + col * (kCardW + kSpacing),
                          origin_y + row * (kCardH + kSpacing));
     }
 
-
-    // FIX #2: se nessuna card è selezionata, posiziona lo scroll
-    // all'inizio del contenuto reale (salta il padding virtuale).
+    // FIX: i range degli scrollbar vengono aggiornati da Qt in modo
+    // asincrono dopo setFixedSize. Schedulare il setValue al ciclo
+    // successivo garantisce che maximum() sia già corretto.
     if (selected_index_ < 0) {
-        horizontalScrollBar()->setValue(virtual_padding_h_);
-        verticalScrollBar()->setValue(virtual_padding_v_);
+        // Nessuna selezione: porta lo scroll al centro del padding virtuale
+        // così la prima card appare centrata nel viewport.
+        const int target_h = virtual_padding_h_;
+        const int target_v = virtual_padding_v_;
+        QTimer::singleShot(0, this, [this, target_h, target_v]() {
+            horizontalScrollBar()->setValue(target_h);
+            verticalScrollBar()->setValue(target_v);
+        });
     } else {
-        // Dopo il relayout, riallinea lo scroll sulla card selezionata
-        // (necessario anche al resize della finestra)
-        ScrollToSelected();
+        QTimer::singleShot(0, this, &GameGridWidget::ScrollToSelected);
     }
 }
 
+// ── ScrollToSelected ────────────────────────────────────────────────────────
+// Centra la card selezionata nel viewport con animazione smooth stile Switch.
 
 void GameGridWidget::ScrollToSelected() {
     if (selected_index_ < 0 ||
         selected_index_ >= static_cast<int>(cards_.size())) return;
 
-
     GameCardWidget* card = cards_[selected_index_];
     if (!card->isVisible()) return;
 
-
     const int vp_w = viewport()->width();
     const int vp_h = viewport()->height();
-
 
     // Centro della card nel sistema di coordinate del container
     const int card_cx = card->x() + kCardW / 2;
     const int card_cy = card->y() + kCardH / 2;
 
-
     // Scroll target: porta il centro della card al centro del viewport
     const int target_h = card_cx - vp_w / 2;
     const int target_v = card_cy - vp_h / 2;
 
-
     const int clamped_h = qBound(0, target_h, horizontalScrollBar()->maximum());
     const int clamped_v = qBound(0, target_v, verticalScrollBar()->maximum());
 
-
-    // Durata proporzionale alla distanza, capped a 220ms — sensazione Switch
     auto smooth = [](QPointer<QVariantAnimation>& anim_ref, QScrollBar* bar,
                      int from, int to)
     {
-        if (!anim_ref.isNull()) {
+        if (!anim_ref.isNull())
             anim_ref->stop();
-            // stop() non distrugge l'oggetto, ma dopo DeleteWhenStopped
-            // il puntatore viene azzerato automaticamente da QPointer
-        }
         if (from == to) return;
-
 
         const int dist = std::abs(to - from);
         const int dur  = qMin(220, 80 + dist / 4);
-
 
         auto* anim = new QVariantAnimation();
         anim->setDuration(dur);
@@ -479,23 +428,18 @@ void GameGridWidget::ScrollToSelected() {
         anim->setStartValue(from);
         anim->setEndValue(to);
 
-
         QObject::connect(anim, &QVariantAnimation::valueChanged,
             bar, [bar](const QVariant& v) { bar->setValue(v.toInt()); });
-        // DeleteWhenStopped: Qt distrugge l'oggetto e QPointer si azzera
         anim->start(QAbstractAnimation::DeleteWhenStopped);
-
 
         anim_ref = anim;
     };
-
 
     smooth(scroll_anim_h_, horizontalScrollBar(),
            horizontalScrollBar()->value(), clamped_h);
     smooth(scroll_anim_v_, verticalScrollBar(),
            verticalScrollBar()->value(), clamped_v);
 }
-
 
 void GameGridWidget::UpdateSelection(int new_index) {
     if (selected_index_ >= 0 && selected_index_ < static_cast<int>(cards_.size()))
@@ -505,64 +449,44 @@ void GameGridWidget::UpdateSelection(int new_index) {
         cards_[selected_index_]->SetSelected(true);
 }
 
-
-void GameGridWidget::showEvent(QShowEvent* event) {
-    QScrollArea::showEvent(event);
-    // FIX #1: il viewport ha dimensioni valide solo al prossimo ciclo
-    // dell'event loop; senza il defer, RelayoutCards() trova avail_w == 0
-    // e ritorna subito senza posizionare nessuna card.
-    QTimer::singleShot(0, this, &GameGridWidget::RelayoutCards);
-}
-
-
 void GameGridWidget::NavigateGrid(int row_delta, int col_delta) {
     if (cards_.empty()) return;
     if (selected_index_ < 0) { SelectFirst(); return; }
 
-
-    // Costruisce la lista degli indici visibili nell'ordine del layout
     std::vector<int> visible_indices;
     visible_indices.reserve(cards_.size());
     for (int i = 0; i < static_cast<int>(cards_.size()); ++i)
         if (cards_[i]->isVisible())
             visible_indices.push_back(i);
 
-
-    // Trova la posizione corrente nella griglia visibile
     auto it = std::find(visible_indices.begin(), visible_indices.end(), selected_index_);
     if (it == visible_indices.end()) { SelectFirst(); return; }
-
 
     const int pos     = static_cast<int>(std::distance(visible_indices.begin(), it));
     const int cols    = qMax(1, last_cols_);
     const int cur_row = pos / cols;
     const int cur_col = pos % cols;
 
-
     const int new_row = cur_row + row_delta;
     const int new_col = cur_col + col_delta;
 
-
-    // Bounds check: non uscire dalla griglia
     const int total_visible = static_cast<int>(visible_indices.size());
     const int total_rows    = (total_visible + cols - 1) / cols;
-
 
     if (new_row < 0 || new_row >= total_rows) return;
     if (new_col < 0 || new_col >= cols)       return;
 
-
     const int new_pos = new_row * cols + new_col;
     if (new_pos < 0 || new_pos >= total_visible) return;
-
 
     UpdateSelection(visible_indices[new_pos]);
     ScrollToSelected();
 }
-
 
 QString GameGridWidget::SelectedGamePath() const {
     if (selected_index_ < 0 || selected_index_ >= static_cast<int>(cards_.size()))
         return {};
     return cards_[selected_index_]->FilePath();
 }
+
+#include "game_grid_widget.moc"

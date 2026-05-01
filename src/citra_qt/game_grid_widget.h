@@ -48,11 +48,11 @@ private:
     QGraphicsDropShadowEffect* shadow_;
     QLabel* cover_label_;
     QLabel* title_label_;
-    QPixmap raw_cover_;   // pixmap originale scalato, senza bordo né clip
+    QPixmap raw_cover_;
 
-    static constexpr int kWidth      = 180;
-    static constexpr int kHeight     = 230;
-    static constexpr int kCoverSize  = 156;
+    static constexpr int kWidth       = 180;
+    static constexpr int kHeight      = 230;
+    static constexpr int kCoverSize   = 156;
     static constexpr int kCoverRadius = 10;
     static constexpr int kBorderWidth = 3;
 };
@@ -63,27 +63,26 @@ class GameGridWidget : public QScrollArea {
     Q_OBJECT
 
 public:
-    void RelayoutCards();
-    // ── Navigazione direzionale (chiamata da GameList via RemoteSwitch) ──────────
-    void NavigateGrid(int row_delta, int col_delta);
-    QString SelectedGamePath() const;
-    bool    HasSelection() const { return selected_index_ >= 0; }
     explicit GameGridWidget(QWidget* parent = nullptr);
 
     void AddGame(const QString& title, const QString& filepath, const QPixmap& cover);
     void Clear();
     void SelectFirst();
     void NavigateBy(int delta);
+    void NavigateGrid(int row_delta, int col_delta);
+    void ApplyFilter(const QString& text);
+    void RelayoutCards();
 
-    int CurrentColumns() const { return last_cols_; }
+    QString SelectedGamePath() const;
+    bool    HasSelection() const { return selected_index_ >= 0; }
+    int     CurrentColumns() const { return last_cols_; }
+
     QString SelectedFilePath() const {
         if (selected_index_ < 0 ||
             selected_index_ >= static_cast<int>(cards_.size()))
             return {};
         return cards_[selected_index_]->FilePath();
     }
-
-    void ApplyFilter(const QString& text);
 
 signals:
     void GameActivated(const QString& filepath);
@@ -92,28 +91,29 @@ signals:
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void showEvent(QShowEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
-    int last_cols_ = 1;
-
     void UpdateSelection(int new_index);
     void ScrollToSelected();
 
     QWidget* container_;
     std::vector<GameCardWidget*> cards_;
     int selected_index_ = -1;
+    int last_cols_      = 1;
 
     // Animazioni scroll smooth stile Switch
     QPointer<QVariantAnimation> scroll_anim_h_;
     QPointer<QVariantAnimation> scroll_anim_v_;
 
-    static constexpr int kCardW      = 160;
-    static constexpr int kCardH      = 210;
-    static constexpr int kSpacing    = 16;
-    static constexpr int kPadding    = 20;
-    // Padding virtuale aggiunto su ogni lato del container così la card
+    // Padding virtuale: aggiunto su ogni lato del container così la card
     // selezionata può sempre essere centrata anche ai bordi della griglia.
-    // Vale metà viewport — calcolato runtime in RelayoutCards.
+    // Calcolato runtime in RelayoutCards (= metà viewport).
     int virtual_padding_h_ = 0;
     int virtual_padding_v_ = 0;
+
+    static constexpr int kCardW   = 160;
+    static constexpr int kCardH   = 210;
+    static constexpr int kSpacing = 16;
+    static constexpr int kPadding = 20;
 };
