@@ -13,6 +13,7 @@
 #include <gst/video/video.h>
 #include "common/settings.h"
 
+#include <sys/sysctl.h>
 #include <atomic>
 #include <thread>
 #include <iostream>
@@ -84,6 +85,44 @@ static std::string getLocalIP() {
     return buf;
 }
 
+static std::string getDeviceFriendlyName() {
+#if defined(__APPLE__)
+ // <-- metti questo in cima al file insieme agli altri include
+    char model[128] = {};
+    size_t size = sizeof(model);
+    if (sysctlbyname("hw.model", model, &size, nullptr, 0) == 0)
+        return std::string(model);
+    return "Mac";
+
+#elif defined(_WIN32)
+    // Registry: HKLM\SYSTEM\HardwareConfig\Current -> SystemProductName
+    HKEY hKey;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+        "SYSTEM\\HardwareConfig\\Current", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+        return "PC";
+
+    char buf[256] = {};
+    DWORD size = sizeof(buf);
+    RegQueryValueExA(hKey, "SystemProductName", nullptr, nullptr,
+                     (LPBYTE)buf, &size);
+    RegCloseKey(hKey);
+    return std::string(buf[0] ? buf : "PC");
+
+#else
+    // Linux: legge /sys/class/dmi/id/product_name
+    std::ifstream f("/sys/class/dmi/id/product_name");
+    if (f) {
+        std::string name;
+        std::getline(f, name);
+        if (!name.empty()) return name;
+    }
+    // Fallback: hostname
+    char buf[128] = {};
+    gethostname(buf, sizeof(buf));
+    return std::string(buf[0] ? buf : "Linux");
+#endif
+}
+
 static void startDiscovery(uint16_t /*sigPort*/) {
     discoveryRunning = true;
     std::thread([] {
@@ -113,8 +152,9 @@ static void startDiscovery(uint16_t /*sigPort*/) {
                   << subnetBcast << " on port 5001\n";
 
         while (discoveryRunning) {
-            sendto(s, "WBRT_HERE", 9, 0, (sockaddr*)&bcast255,    sizeof(bcast255));
-            sendto(s, "WBRT_HERE", 9, 0, (sockaddr*)&bcastSubnet, sizeof(bcastSubnet));
+            std::string payload = "WBRT_HERE|" + getDeviceFriendlyName();
+            sendto(s, payload.data(), (int)payload.size(), 0, (sockaddr*)&bcast255,    sizeof(bcast255));
+            sendto(s, payload.data(), (int)payload.size(), 0, (sockaddr*)&bcastSubnet, sizeof(bcastSubnet));
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
         closesocket(s);
