@@ -355,25 +355,30 @@ void ScreenStreamer::initGStreamer(uint16_t /*port*/) {
 /*  DIRECT MODE                                                         */
 /* ------------------------------------------------------------------ */
 void ScreenStreamer::stopDirectMode() {
-    if (!directMode && !directPipeline) return;
-
+    std::cerr << "[stopDirect] inizio — directMode=" << directMode
+              << " pipeline=" << (directPipeline ? "viva" : "null") << "\n";
+    if (!directMode && !directPipeline) {
+        std::cerr << "[stopDirect] nulla da fare, esco\n";
+        return;
+    }
     directMode = false;
-
-    Settings::values.layout_option.SetValue(previous_layout);
-    system->GPU().Renderer().UpdateCurrentFramebufferLayout();
 
     if (directAppsrc)
         gst_app_src_end_of_stream(GST_APP_SRC(directAppsrc));
 
     if (directPipeline) {
         gst_element_set_state(directPipeline, GST_STATE_NULL);
-        gst_element_get_state(directPipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
+        GstStateChangeReturn ret = gst_element_get_state(
+            directPipeline, nullptr, nullptr, 3 * GST_SECOND);
+        std::cerr << "[stopDirect] get_state ret=" << ret << "\n";
         gst_object_unref(directPipeline);
         directPipeline = nullptr;
         directAppsrc   = nullptr;
     }
-
     directFrameCount = 0;
+    lastFrameW = 0;
+    lastFrameH = 0;
+    std::cerr << "[stopDirect] completato\n";
 }
 
 void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rtpPort) {
@@ -622,8 +627,14 @@ void ScreenStreamer::handleStick(int16_t lx, int16_t ly, int16_t rx, int16_t ry)
 void ScreenStreamer::sendFrame(const void* data, int w, int h) {
     if (!data || !directMode || !directAppsrc) return;
 
-    static int last_w = 0, last_h = 0;
-    if (w != last_w || h != last_h) {
+
+    if (directFrameCount == 0) {
+        Settings::values.layout_option.SetValue(Settings::LayoutOption::SingleScreen);
+        system->GPU().Renderer().UpdateCurrentFramebufferLayout();
+        std::cerr << "[Streaming] Layout aggiornato al primo frame\n";
+    }
+
+    if (w != lastFrameW || h != lastFrameH) {
         GstCaps* caps = gst_caps_new_simple("video/x-raw",
             "format",             G_TYPE_STRING,     "BGRA",
             "width",              G_TYPE_INT,        w,
@@ -633,8 +644,8 @@ void ScreenStreamer::sendFrame(const void* data, int w, int h) {
             nullptr);
         gst_app_src_set_caps(GST_APP_SRC(directAppsrc), caps);
         gst_caps_unref(caps);
-        last_w = w;
-        last_h = h;
+        lastFrameW = w;
+        lastFrameH = h;
         std::cerr << "[Streaming] Caps: " << w << "x" << h << "\n";
     }
 
@@ -826,16 +837,26 @@ ScreenStreamer::~ScreenStreamer() {
 }
 
 void ScreenStreamer::OnGameStarted() {
+    std::cerr << "[Stream] OnGameStarted — direct_pending=" << direct_pending
+              << " directMode=" << directMode
+              << " directPipeline=" << (directPipeline ? "VIVO" : "null")
+              << " ip=" << pending_ip << "\n";
     if (direct_pending) {
         direct_pending = false;
-        std::cerr << "[Stream] Gioco avviato, avvio stream pendente\n";
         handleDirectClient(pending_ip, pending_port);
     }
 }
 
+
 void ScreenStreamer::OnGameStopped() {
-    std::cerr << "[Stream] Gioco fermato, stop stream\n";
+    std::cerr << "[Stream] OnGameStopped — directMode=" << directMode
+              << " ip=" << pending_ip << "\n";
+
+    // Salva sempre il pending se abbiamo un client
+    if (!pending_ip.empty()) {
+        direct_pending = true;
+        std::cerr << "[Stream] direct_pending=true salvato\n";
+    }
+
     stopDirectMode();
-    // direct_pending rimane true se era pendente,
-    // così al prossimo gioco parte automaticamente
 }

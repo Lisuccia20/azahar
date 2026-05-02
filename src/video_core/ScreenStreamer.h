@@ -65,6 +65,8 @@ public:
     std::string directSourceFormat = "RGBA";
     void SetOnStopCallback(std::function<void()> cb) { on_stop_callback = std::move(cb); }
 private:
+  int lastFrameW = 0;
+  int lastFrameH = 0;
  std::set<int> buttons_held_;
     std::function<void()> on_stop_callback;
   std::function<void()> on_connected_callback;
