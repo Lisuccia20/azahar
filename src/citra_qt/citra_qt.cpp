@@ -4161,7 +4161,8 @@ void GMainWindow::OnStreamerConnected() {
     game_list->SetViewMode(GameList::ViewMode::Grid);
 
     // Passa in fullscreen quando lo streamer si connette
-    showFullScreen();
+    ui->action_Fullscreen->setChecked(true);
+    ShowFullscreen();
 
     QTimer::singleShot(0, this, [this]() {
         game_list->RefreshLayout();
@@ -4187,6 +4188,9 @@ void GMainWindow::OnStreamerDisconnected() {
     UpdateUITheme();
     emit UpdateThemedIcons();
     game_list->SetViewMode(GameList::ViewMode::List);
+
+    ui->action_Fullscreen->setChecked(false);
+    HideFullscreen();
 
     // Rimuovi i callback per evitare dangling references
     if (auto remote = InputCommon::GetRemoteSwitch()) {

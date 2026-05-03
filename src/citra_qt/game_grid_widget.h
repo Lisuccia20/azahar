@@ -51,10 +51,10 @@ private:
     QPixmap raw_cover_;
 
     // Dimensioni stile Switch: cover quadrata grande, card alta
-    static constexpr int kWidth       = 250;
-    static constexpr int kHeight      = 300;
-    static constexpr int kCoverSize   = 220;
-    static constexpr int kCoverRadius = 12;
+    static constexpr int kWidth       = 300;
+    static constexpr int kHeight      = 345;
+    static constexpr int kCoverSize   = 260;
+    static constexpr int kCoverRadius = 16;
     static constexpr int kBorderWidth = 4;
 };
 
@@ -115,8 +115,8 @@ private:
     // il secondo aggiorna i range degli scrollbar).
     int layout_generation_ = 0;
 
-    static constexpr int kCardW   = 230;   // deve matchare kWidth - margini card
-    static constexpr int kCardH   = 280;   // deve matchare kHeight - margini card
-    static constexpr int kSpacing = 24;
-    static constexpr int kPadding = 28;
+    static constexpr int kCardW   = 275;   // step orizzontale per il layout
+    static constexpr int kCardH   = 320;   // step verticale per il layout
+    static constexpr int kSpacing = 28;
+    static constexpr int kPadding = 40;
 };
