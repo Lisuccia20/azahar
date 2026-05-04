@@ -456,7 +456,8 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
 
     // Sostituisci la tua parte dei caps con questa:
     bool needs_nv12 = (encoder_name == std::string("vaapih264enc") ||
-                    encoder_name == std::string("amfh264enc"));
+                    encoder_name == std::string("amfh264enc")  ||
+                    encoder_name == std::string("mfh264enc"));
     GstCaps* f_caps = gst_caps_from_string(
         needs_nv12 ? "video/x-raw,format=NV12" : "video/x-raw,format=I420");
     g_object_set(filter, "caps", f_caps, nullptr);
