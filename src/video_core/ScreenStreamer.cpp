@@ -456,7 +456,8 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
 
     // Sostituisci la tua parte dei caps con questa:
     bool needs_nv12 = (encoder_name == std::string("vaapih264enc") ||
-                    encoder_name == std::string("amfh264enc")  ||
+                    encoder_name == std::string("vah264enc")    ||
+                    encoder_name == std::string("amfh264enc")   ||
                     encoder_name == std::string("mfh264enc"));
     GstCaps* f_caps = gst_caps_from_string(
         needs_nv12 ? "video/x-raw,format=NV12" : "video/x-raw,format=I420");
@@ -474,8 +475,9 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
                     "max-keyframe-interval", 60,
                     nullptr);
     }
-    else if (encoder_name == std::string("vaapih264enc")) {
-        // --- Configurazione Linux (VA-API / Steam Deck) ---
+    else if (encoder_name == std::string("vaapih264enc") ||
+             encoder_name == std::string("vah264enc")) {
+        // --- Configurazione Linux VA-API (Intel/AMD/NVIDIA) ---
         g_object_set(enc,
                     "bitrate", 10000,
                     nullptr);
