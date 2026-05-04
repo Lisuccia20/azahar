@@ -400,7 +400,7 @@ void ScreenStreamer::handleDirectClient(const std::string& clientIp, uint16_t rt
 #if defined(__APPLE__)
     encoder_name = "vtenc_h264"; // VideoToolbox (Hardware Mac)
 #elif defined(__linux__)
-    encoder_name = "vaapih264enc"; // VA-API (Hardware Linux/SteamOS)
+    encoder_name = "vah264enc";
 #elif defined(_WIN32)
     GstElementFactory* amf_factory = gst_element_factory_find("amfh264enc");
     GstElementFactory* mf_factory  = gst_element_factory_find("mfh264enc");
